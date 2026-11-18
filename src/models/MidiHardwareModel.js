@@ -4,9 +4,6 @@ const EventEmitter = require('events');
 const easymidi = require('easymidi');
 
 class MidiHardwareModel extends EventEmitter {
-    /**
-     * @param {string} portName
-     */
     constructor(portName) {
         super();
         this.portName = portName;
@@ -14,17 +11,12 @@ class MidiHardwareModel extends EventEmitter {
         this.midiIn = null;
     }
 
-    /**
-     * Initializes bidirectional virtual MIDI ports.
-     * @throws {Error} If required Windows loopMIDI ports are missing.
-     */
     initialize() {
         if (process.platform === 'win32') {
             this.#initializeWindowsPorts();
         } else {
             this.#initializeUnixVirtualPorts();
         }
-
         this.#bindIncomingEvents();
     }
 
@@ -63,10 +55,6 @@ class MidiHardwareModel extends EventEmitter {
         });
     }
 
-    /**
-     * Dispatches a validated MIDI message to the DAW.
-     * @param {{ type: string, channel?: number, cc?: number, value?: number, note?: number, velocity?: number }} payload
-     */
     sendMidiMessage(payload) {
         if (!this.midiOut) return;
 
@@ -102,12 +90,6 @@ class MidiHardwareModel extends EventEmitter {
         }
     }
 
-    /**
-     * @param {number} val
-     * @param {number} min
-     * @param {number} max
-     * @returns {number}
-     */
     #clampMidi(val, min = 0, max = 127) {
         const num = Number(val);
         if (Number.isNaN(num)) return min;

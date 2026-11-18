@@ -22,10 +22,13 @@ body {
     background-color: var(--bg-dark);
     color: var(--text-main);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    height: 100dvh;
+    height: auto;
+    min-height: 100dvh;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
+    overflow-x: hidden;
+    overflow-y: auto;
+    touch-action: none;
 }
 
 header {
@@ -66,6 +69,7 @@ header {
     display: flex;
     gap: 8px;
     align-items: center;
+    flex-wrap: wrap;
 }
 
 .channel-label {
@@ -81,6 +85,14 @@ select, button {
     border-radius: 6px;
     font-size: 0.82rem;
     cursor: pointer;
+}
+
+button.sustain-active {
+    background: var(--accent);
+    color: #09090b;
+    font-weight: 700;
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.45);
 }
 
 button.edit-active {
@@ -103,29 +115,201 @@ body.edit-mode .pad-note {
     color: var(--accent-edit);
 }
 
+/* Chord Progression Sequencer */
+.chord-sequencer-panel {
+    background: var(--panel-bg);
+    border: 1px solid #2e2e36;
+    border-radius: 8px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.chord-controls-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.chord-play-btn {
+    background: #22c55e;
+    color: #052e16;
+    border-color: #22c55e;
+    font-weight: 800;
+    padding: 6px 12px;
+    min-width: 112px;
+}
+
+.chord-play-btn.playing {
+    background: #ef4444;
+    color: #fff;
+    border-color: #ef4444;
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+.chord-text-input {
+    flex: 1;
+    min-width: 180px;
+    background: var(--bg-dark);
+    color: var(--text-main);
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 0.88rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    user-select: text;
+    -webkit-user-select: text;
+    touch-action: auto;
+}
+
+.chord-text-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.chord-param-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+
+.chord-num-input {
+    width: 56px;
+    background: var(--bg-dark);
+    color: var(--accent);
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 5px 6px;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: center;
+    user-select: text;
+    -webkit-user-select: text;
+    touch-action: auto;
+}
+
+.chord-num-input.small {
+    width: 40px;
+}
+
+.time-sig-box {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+#chordLoopBtn.active {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+
+.chord-cards-strip {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: #52525b var(--bg-dark);
+}
+
+.chord-card {
+    background: #27272a;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    padding: 5px 10px;
+    min-width: 82px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    transition: background 0.08s, border-color 0.08s, transform 0.08s;
+}
+
+.chord-card.playing {
+    background: rgba(0, 229, 255, 0.2);
+    border-color: var(--accent);
+    box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
+    transform: translateY(-1px);
+}
+
+.chord-card.invalid {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.chord-symbol {
+    font-size: 0.85rem;
+    font-weight: 800;
+    color: #fff;
+}
+
+.chord-card.playing .chord-symbol {
+    color: var(--accent);
+}
+
+.chord-notes {
+    font-size: 0.65rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+.chord-empty-hint {
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    padding: 4px 2px;
+}
+
+/* Main Workspace */
 .workspace {
     display: grid;
     grid-template-columns: 1.4fr 1fr;
     gap: 12px;
     flex: 1;
-    min-height: 0;
+    min-height: 360px;
+}
+
+@media (max-width: 820px) {
+    .workspace {
+        grid-template-columns: 1fr;
+    }
 }
 
 .left-section {
     display: flex;
     flex-direction: column;
     gap: 10px;
-    min-height: 0;
+    min-width: 0;
+    min-height: 340px;
 }
 
 .knobs-row {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
+    grid-template-columns: repeat(8, minmax(48px, 1fr));
     gap: 6px;
     background: var(--panel-bg);
     padding: 10px 4px;
     border-radius: 8px;
     border: 1px solid #2e2e36;
+    overflow-x: auto;
+    touch-action: none;
+    scrollbar-width: thin;
+    scrollbar-color: #52525b var(--bg-dark);
+}
+
+.knobs-row::-webkit-scrollbar {
+    height: 6px;
+}
+
+.knobs-row::-webkit-scrollbar-thumb {
+    background: #52525b;
+    border-radius: 4px;
 }
 
 .knob-unit {
@@ -137,6 +321,7 @@ body.edit-mode .pad-note {
     border-radius: 6px;
     min-width: 0;
     overflow: hidden;
+    touch-action: none;
 }
 
 .knob-dial {
@@ -161,14 +346,37 @@ body.edit-mode .pad-note {
 
 .faders-row {
     display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    gap: 6px;
+    grid-template-columns: repeat(8, minmax(48px, 1fr));
+    gap: 8px;
     background: var(--panel-bg);
-    padding: 10px 4px;
+    padding: 10px 8px 12px 8px;
     border-radius: 8px;
     border: 1px solid #2e2e36;
     flex: 1;
-    min-height: 0;
+    min-height: 220px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    touch-action: none;
+    scrollbar-width: thin;
+    scrollbar-color: #52525b var(--bg-dark);
+}
+
+.faders-row::-webkit-scrollbar {
+    height: 8px;
+}
+
+.faders-row::-webkit-scrollbar-track {
+    background: var(--bg-dark);
+    border-radius: 4px;
+}
+
+.faders-row::-webkit-scrollbar-thumb {
+    background: #52525b;
+    border-radius: 4px;
+}
+
+.faders-row::-webkit-scrollbar-thumb:hover {
+    background: var(--accent);
 }
 
 .fader-unit {
@@ -184,13 +392,15 @@ body.edit-mode .pad-note {
 }
 
 .fader-track {
-    width: 28px;
+    width: 30px;
     flex: 1;
+    min-height: 135px;
     background: var(--track-bg);
     border-radius: 6px;
     position: relative;
     overflow: hidden;
     border: 1px solid #3f3f46;
+    touch-action: none;
 }
 
 .fader-fill {
@@ -264,12 +474,13 @@ body.edit-mode .pad-note {
 .pads-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: repeat(4, 1fr);
+    grid-template-rows: repeat(4, minmax(64px, 1fr));
     gap: 8px;
     background: var(--panel-bg);
     padding: 10px;
     border-radius: 8px;
     border: 1px solid #2e2e36;
+    min-height: 300px;
 }
 
 .pad {
@@ -283,6 +494,7 @@ body.edit-mode .pad-note {
     transition: background 0.04s, transform 0.04s;
     min-width: 0;
     overflow: hidden;
+    touch-action: none;
 }
 
 .pad .marquee-box {
@@ -292,6 +504,12 @@ body.edit-mode .pad-note {
 .pad .marquee-text {
     font-size: 0.85rem;
     font-weight: 700;
+}
+
+.pad.sustained {
+    background: rgba(255, 61, 113, 0.35);
+    border-color: var(--accent);
+    box-shadow: inset 0 0 10px rgba(0, 229, 255, 0.35);
 }
 
 .pad.active {
@@ -540,19 +758,4 @@ body.edit-mode .pad-note {
     background: #ef4444;
     color: #fff;
     border-color: #ef4444;
-}
-
-button.sustain-active {
-    background: var(--accent);
-    color: #09090b;
-    font-weight: 700;
-    border-color: var(--accent);
-    box-shadow: 0 0 12px rgba(0, 229, 255, 0.45);
-}
-
-/* Visual indicator for pads currently held by Sustain */
-.pad.sustained {
-    background: rgba(255, 61, 113, 0.35);
-    border-color: var(--accent);
-    box-shadow: inset 0 0 10px rgba(0, 229, 255, 0.35);
 }

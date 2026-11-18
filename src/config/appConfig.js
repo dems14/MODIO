@@ -3,10 +3,6 @@
 const os = require('os');
 const path = require('path');
 
-/**
- * Resolves the primary non-internal IPv4 address for local network access.
- * @returns {string}
- */
 function resolveLocalIp() {
     const interfaces = os.networkInterfaces();
     for (const ifaceList of Object.values(interfaces)) {

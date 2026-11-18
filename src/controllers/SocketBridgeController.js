@@ -3,10 +3,6 @@
 const WebSocket = require('ws');
 
 class SocketBridgeController {
-    /**
-     * @param {WebSocket.Server} wss
-     * @param {import('../MidiHardwareModel')} midiModel
-     */
     constructor(wss, midiModel) {
         this.wss = wss;
         this.midiModel = midiModel;
@@ -17,10 +13,6 @@ class SocketBridgeController {
         this.midiModel.on('daw:cc', (message) => this.#broadcastToClients(message));
     }
 
-    /**
-     * @param {WebSocket} ws
-     * @param {import('http').IncomingMessage} req
-     */
     #handleClientConnection(ws, req) {
         const clientIp = req.socket.remoteAddress;
         console.log(`[Socket Controller] Client connected: ${clientIp}`);
@@ -39,9 +31,6 @@ class SocketBridgeController {
         });
     }
 
-    /**
-     * @param {Object} message
-     */
     #broadcastToClients(message) {
         const serialized = JSON.stringify(message);
         this.wss.clients.forEach((client) => {
