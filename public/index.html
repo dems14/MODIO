@@ -23,7 +23,14 @@
     </div>
 </header>
 
-<section class="chord-sequencer-panel" aria-label="Chord Progression Player">
+<nav class="tab-bar" id="mainTabBar" aria-label="Workspace Sections">
+    <button type="button" class="tab-btn active" data-tab="all">All</button>
+    <button type="button" class="tab-btn" data-tab="controls">Controls (Knobs &amp; Faders)</button>
+    <button type="button" class="tab-btn" data-tab="pads">Pads</button>
+    <button type="button" class="tab-btn" data-tab="chords">Chord Player</button>
+</nav>
+
+<section class="chord-sequencer-panel" id="chordPanel" aria-label="Chord Progression Player">
     <div class="chord-controls-row">
         <button type="button" id="chordPlayBtn" class="chord-play-btn">▶ Play Chords</button>
 
@@ -81,8 +88,8 @@
     <div class="chord-cards-strip" id="chordCardsContainer"></div>
 </section>
 
-<main class="workspace">
-    <section class="left-section">
+<main class="workspace" id="mainWorkspace">
+    <section class="left-section" id="controlsSection">
         <div class="knobs-row" id="knobsContainer"></div>
         <div class="faders-row" id="fadersContainer"></div>
     </section>
