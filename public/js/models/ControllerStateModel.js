@@ -22,15 +22,21 @@ export class ControllerStateModel {
         this.faderValues = new Array(8).fill(0);
     }
 
-    /**
-     * Converts a MIDI note number (0–127) into scientific pitch notation.
-     * @param {number} noteNumber
-     * @returns {string}
-     */
     static formatNoteName(noteNumber) {
         const name = NOTE_NAMES[noteNumber % 12];
         const octave = Math.floor(noteNumber / 12) - 1;
         return `${name}${octave}`;
+    }
+
+    #loadChannelFromStorage() {
+        const saved = parseInt(localStorage.getItem(CHANNEL_STORAGE_KEY), 10);
+        return !Number.isNaN(saved) && saved >= 0 && saved <= 15 ? saved : 0;
+    }
+
+    setMidiChannel(channelIndex) {
+        const clamped = Math.max(0, Math.min(15, Number(channelIndex) || 0));
+        this.midiChannel = clamped;
+        localStorage.setItem(CHANNEL_STORAGE_KEY, String(clamped));
     }
 
     setSustain(isOn) {
@@ -38,19 +44,6 @@ export class ControllerStateModel {
         if (!this.isSustainOn) {
             this.sustainedPads.clear();
         }
-    }
-
-    #loadChannelFromStorage() {
-        const savedChannel = parseInt(localStorage.getItem(CHANNEL_STORAGE_KEY), 10);
-        return !Number.isNaN(savedChannel) && savedChannel >= 0 && savedChannel <= 15
-            ? savedChannel
-            : 0;
-    }
-
-    setMidiChannel(channelIndex) {
-        const clamped = Math.max(0, Math.min(15, Number(channelIndex) || 0));
-        this.midiChannel = clamped;
-        localStorage.setItem(CHANNEL_STORAGE_KEY, String(clamped));
     }
 
     #loadFromStorage() {

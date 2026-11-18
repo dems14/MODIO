@@ -1,7 +1,7 @@
 {
   "name": "wifi-midi-controller",
-  "version": "2.0.0",
-  "description": "MVC Wi-Fi Touch MIDI Controller for DAWs",
+  "version": "2.1.0",
+  "description": "MVC Wi-Fi Touch MIDI Controller with Chord Player & Sustain",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

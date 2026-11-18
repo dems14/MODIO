@@ -36,6 +36,14 @@ export class ControlSurfaceView {
         this.statusText.textContent = label;
     }
 
+    setSustainState(isOn) {
+        this.sustainBtn.classList.toggle('sustain-active', isOn);
+        this.sustainBtn.textContent = isOn ? 'Sustain: ON' : 'Sustain: OFF';
+        if (!isOn) {
+            this.clearAllSustainedPads();
+        }
+    }
+
     setEditMode(isEditMode) {
         document.body.classList.toggle('edit-mode', isEditMode);
         this.editModeBtn.classList.toggle('edit-active', isEditMode);
@@ -177,6 +185,17 @@ export class ControlSurfaceView {
         if (refs) refs.pad.classList.toggle('active', isActive);
     }
 
+    setPadSustained(index, isSustained) {
+        const refs = this.padElements[index];
+        if (refs) refs.pad.classList.toggle('sustained', isSustained);
+    }
+
+    clearAllSustainedPads() {
+        this.padElements.forEach((refs) => {
+            if (refs) refs.pad.classList.remove('sustained');
+        });
+    }
+
     applyMarquee(boxEl, textEl, newText) {
         if (newText !== undefined) textEl.textContent = newText;
 
@@ -200,25 +219,6 @@ export class ControlSurfaceView {
         document.querySelectorAll('.marquee-box').forEach((box) => {
             const textEl = box.querySelector('.marquee-text');
             if (textEl) this.applyMarquee(box, textEl);
-        });
-    }
-
-    setSustainState(isOn) {
-        this.sustainBtn.classList.toggle('sustain-active', isOn);
-        this.sustainBtn.textContent = isOn ? 'Sustain: ON' : 'Sustain: OFF';
-        if (!isOn) {
-            this.clearAllSustainedPads();
-        }
-    }
-
-    setPadSustained(index, isSustained) {
-        const refs = this.padElements[index];
-        if (refs) refs.pad.classList.toggle('sustained', isSustained);
-    }
-
-    clearAllSustainedPads() {
-        this.padElements.forEach((refs) => {
-            if (refs) refs.pad.classList.remove('sustained');
         });
     }
 }
