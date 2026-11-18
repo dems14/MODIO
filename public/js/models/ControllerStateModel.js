@@ -15,6 +15,8 @@ export class ControllerStateModel {
     constructor() {
         this.midiChannel = this.#loadChannelFromStorage();
         this.isEditMode = false;
+        this.isSustainOn = false;
+        this.sustainedPads = new Set();
         this.map = this.#loadFromStorage();
         this.knobValues = new Array(8).fill(64);
         this.faderValues = new Array(8).fill(0);
@@ -29,6 +31,13 @@ export class ControllerStateModel {
         const name = NOTE_NAMES[noteNumber % 12];
         const octave = Math.floor(noteNumber / 12) - 1;
         return `${name}${octave}`;
+    }
+
+    setSustain(isOn) {
+        this.isSustainOn = Boolean(isOn);
+        if (!this.isSustainOn) {
+            this.sustainedPads.clear();
+        }
     }
 
     #loadChannelFromStorage() {
