@@ -19,6 +19,7 @@ export class MidiClientController {
         this.surfaceView.renderChannelOptions();
         this.surfaceView.channelSelect.value = String(this.model.midiChannel);
         this.#bindHeaderEvents();
+        this.#bindTabEvents();
         this.#bindChordSequencerEvents();
         this.#bindTwoFingerScroll();
 
@@ -29,8 +30,21 @@ export class MidiClientController {
             bindPadEvents: (i, refs) => this.#bindPadEvents(i, refs),
         });
 
+        this.surfaceView.setActiveTab(this.model.activeTab);
+
         window.addEventListener('resize', () => this.surfaceView.refreshAllMarquees());
         this.#connectWebSocket();
+    }
+
+    #bindTabEvents() {
+        this.surfaceView.tabButtons.forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const selectedTab = btn.dataset.tab;
+                this.model.setActiveTab(selectedTab);
+                this.surfaceView.setActiveTab(selectedTab);
+                window.scrollTo(0, 0);
+            });
+        });
     }
 
     #bindHeaderEvents() {
@@ -64,6 +78,7 @@ export class MidiClientController {
                     bindFaderEvents: (i, refs) => this.#bindFaderEvents(i, refs),
                     bindPadEvents: (i, refs) => this.#bindPadEvents(i, refs),
                 });
+                this.surfaceView.setActiveTab(this.model.activeTab);
             }
         });
 

@@ -1,5 +1,7 @@
 const STORAGE_KEY = 'wifi_midi_custom_map_v2';
 const CHANNEL_STORAGE_KEY = 'wifi_midi_selected_channel_v1';
+const TAB_STORAGE_KEY = 'wifi_midi_active_tab_v1';
+const VALID_TABS = Object.freeze(['all', 'controls', 'pads', 'chords']);
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
 const DEFAULT_MAP = Object.freeze({
@@ -14,6 +16,7 @@ const DEFAULT_MAP = Object.freeze({
 export class ControllerStateModel {
     constructor() {
         this.midiChannel = this.#loadChannelFromStorage();
+        this.activeTab = this.#loadTabFromStorage();
         this.isEditMode = false;
         this.isSustainOn = false;
         this.sustainedPads = new Set();
@@ -33,10 +36,21 @@ export class ControllerStateModel {
         return !Number.isNaN(saved) && saved >= 0 && saved <= 15 ? saved : 0;
     }
 
+    #loadTabFromStorage() {
+        const saved = localStorage.getItem(TAB_STORAGE_KEY);
+        return VALID_TABS.includes(saved) ? saved : 'all';
+    }
+
     setMidiChannel(channelIndex) {
         const clamped = Math.max(0, Math.min(15, Number(channelIndex) || 0));
         this.midiChannel = clamped;
         localStorage.setItem(CHANNEL_STORAGE_KEY, String(clamped));
+    }
+
+    setActiveTab(tabName) {
+        if (!VALID_TABS.includes(tabName)) return;
+        this.activeTab = tabName;
+        localStorage.setItem(TAB_STORAGE_KEY, tabName);
     }
 
     setSustain(isOn) {

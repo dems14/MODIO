@@ -12,6 +12,11 @@ export class ControlSurfaceView {
         this.channelSelect = document.getElementById('midiChannel');
         this.fullscreenBtn = document.getElementById('fullscreenBtn');
 
+        this.tabButtons = Array.from(document.querySelectorAll('.tab-btn'));
+        this.chordPanel = document.getElementById('chordPanel');
+        this.mainWorkspace = document.getElementById('mainWorkspace');
+        this.controlsSection = document.getElementById('controlsSection');
+
         this.knobsContainer = document.getElementById('knobsContainer');
         this.fadersContainer = document.getElementById('fadersContainer');
         this.padsContainer = document.getElementById('padsContainer');
@@ -34,6 +39,26 @@ export class ControlSurfaceView {
     setConnectionStatus(isConnected, label) {
         this.statusDot.classList.toggle('connected', isConnected);
         this.statusText.textContent = label;
+    }
+
+    setActiveTab(tabName) {
+        this.tabButtons.forEach((btn) => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+
+        const isSingleTab = tabName !== 'all';
+        document.body.classList.toggle('single-tab-mode', isSingleTab);
+
+        const showChords = tabName === 'all' || tabName === 'chords';
+        const showControls = tabName === 'all' || tabName === 'controls';
+        const showPads = tabName === 'all' || tabName === 'pads';
+
+        this.chordPanel.classList.toggle('tab-hidden', !showChords);
+        this.controlsSection.classList.toggle('tab-hidden', !showControls);
+        this.padsContainer.classList.toggle('tab-hidden', !showPads);
+        this.mainWorkspace.classList.toggle('tab-hidden', !showControls && !showPads);
+
+        this.refreshAllMarquees();
     }
 
     setSustainState(isOn) {
