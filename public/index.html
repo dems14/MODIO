@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wi-Fi MIDI Controller</title>
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+
+<header>
+    <div class="status">
+        <div id="statusDot" class="status-dot"></div>
+        <span id="statusText">Disconnected</span>
+    </div>
+    <div class="controls-top">
+        <button type="button" id="editModeBtn">Edit Controls</button>
+        <button type="button" id="resetMapBtn" title="Restore default names and MIDI numbers">Reset</button>
+        <label for="midiChannel" class="channel-label">Ch:</label>
+        <select id="midiChannel"></select>
+        <button type="button" id="fullscreenBtn">Fullscreen</button>
+    </div>
+</header>
+
+<main class="workspace">
+    <section class="left-section">
+        <div class="knobs-row" id="knobsContainer"></div>
+        <div class="faders-row" id="fadersContainer"></div>
+    </section>
+    <section class="pads-grid" id="padsContainer"></section>
+</main>
+
+<!-- Touch & Keyboard-Friendly Modal Dialog -->
+<div class="modal-backdrop" id="customModal" aria-hidden="true">
+    <div class="modal-box" role="dialog" aria-modal="true">
+        <div class="modal-header">
+            <h3 class="modal-title" id="modalTitle">Edit Control</h3>
+        </div>
+        <p class="modal-message" id="modalMessage"></p>
+
+        <div class="modal-fields" id="modalFields">
+            <div class="modal-field-group">
+                <label for="modalNameInput">Control Name</label>
+                <div class="input-with-clear">
+                    <input type="text" id="modalNameInput" class="modal-input" maxlength="40" autocomplete="off" enterkeyhint="done">
+                    <button type="button" class="clear-input-btn" id="clearNameBtn" title="Clear name">✕</button>
+                </div>
+                <div class="preset-chips" id="presetChips"></div>
+            </div>
+
+            <div class="modal-field-group">
+                <label for="modalMidiInput">
+                    <span id="modalMidiLabel">MIDI CC (0 – 127)</span>
+                    <span class="note-preview-badge" id="notePreviewBadge"></span>
+                </label>
+                <div class="stepper-row">
+                    <button type="button" class="step-btn" data-step="-10">-10</button>
+                    <button type="button" class="step-btn" data-step="-1">-1</button>
+                    <input type="number" id="modalMidiInput" class="modal-input stepper-input" min="0" max="127" inputmode="numeric" enterkeyhint="done">
+                    <button type="button" class="step-btn" data-step="1">+1</button>
+                    <button type="button" class="step-btn" data-step="10">+10</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="modal-error" id="modalError"></div>
+
+        <div class="modal-actions">
+            <button type="button" class="btn-modal" id="modalCancelBtn">Cancel</button>
+            <button type="button" class="btn-modal btn-primary" id="modalConfirmBtn">Save</button>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="./js/app.js"></script>
+</body>
+</html>
