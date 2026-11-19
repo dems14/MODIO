@@ -112,6 +112,7 @@ export class MidiClientController {
         let lastMidX = 0;
         let lastMidY = 0;
         let horizontalTarget = null;
+        let verticalTarget = null;
 
         const getMidpoint = (t1, t2) => ({
             x: (t1.clientX + t2.clientX) / 2,
@@ -131,7 +132,8 @@ export class MidiClientController {
                     lastMidY = mid.y;
 
                     const targetEl = e.target instanceof Element ? e.target : null;
-                    horizontalTarget = targetEl?.closest('.faders-row, .knobs-row, .chord-cards-strip, .pentagram-strip') || null;
+                    horizontalTarget = targetEl?.closest('.faders-row, .knobs-row, .chord-cards-strip') || null;
+                    verticalTarget = targetEl?.closest('.pentagram-strip, .chord-cards-strip') || null;
                 }
             },
             { passive: true }
@@ -154,7 +156,11 @@ export class MidiClientController {
                 }
 
                 if (Math.abs(deltaY) > 0.5) {
-                    window.scrollBy(0, deltaY);
+                    if (verticalTarget && verticalTarget.scrollHeight > verticalTarget.clientHeight) {
+                        verticalTarget.scrollTop += deltaY;
+                    } else {
+                        window.scrollBy(0, deltaY);
+                    }
                 }
             },
             { passive: true }
@@ -164,6 +170,7 @@ export class MidiClientController {
             if (e.touches.length < 2) {
                 isTwoFingerScrolling = false;
                 horizontalTarget = null;
+                verticalTarget = null;
             }
         };
 
