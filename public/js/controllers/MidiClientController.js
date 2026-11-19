@@ -1,3 +1,5 @@
+import { ChordSequencerModel } from '../models/ChordSequencerModel.js';
+
 export class MidiClientController {
     constructor(model, surfaceView, modalView, chordModel, chordView) {
         this.model = model;
@@ -11,8 +13,10 @@ export class MidiClientController {
         this.draggingFaders = new Array(8).fill(false);
 
         this.chordTimerId = null;
-        this.activeChordNotes = [];
+        this.scheduledNoteTimers = new Set();
+        this.activeChordNotes = new Set();
         this.nextStepDeadline = 0;
+        this.totalBarsPlayed = 0;
     }
 
     initialize() {
@@ -127,7 +131,7 @@ export class MidiClientController {
                     lastMidY = mid.y;
 
                     const targetEl = e.target instanceof Element ? e.target : null;
-                    horizontalTarget = targetEl?.closest('.faders-row, .knobs-row, .chord-cards-strip') || null;
+                    horizontalTarget = targetEl?.closest('.faders-row, .knobs-row, .chord-cards-strip, .pentagram-strip') || null;
                 }
             },
             { passive: true }
@@ -167,15 +171,67 @@ export class MidiClientController {
         document.addEventListener('touchcancel', endGesture, { passive: true });
     }
 
+    async #extractSheetContent(file) {
+        const lowerName = file.name.toLowerCase();
+
+        if (lowerName.endsWith('.mxl')) {
+            if (typeof window.JSZip === 'undefined') {
+                throw new Error('JSZip library failed to load. Check internet connection or install jszip locally.');
+            }
+
+            const arrayBuffer = await file.arrayBuffer();
+            const zip = await window.JSZip.loadAsync(arrayBuffer);
+
+            let targetXmlPath = null;
+            const containerFile = zip.file('META-INF/container.xml');
+            if (containerFile) {
+                const containerXml = await containerFile.async('string');
+                const doc = new DOMParser().parseFromString(containerXml, 'application/xml');
+                const rootfileEl = doc.querySelector('rootfile[full-path]');
+                if (rootfileEl) {
+                    targetXmlPath = rootfileEl.getAttribute('full-path');
+                }
+            }
+
+            if (!targetXmlPath || !zip.file(targetXmlPath)) {
+                targetXmlPath = Object.keys(zip.files).find(
+                    (path) =>
+                        !path.startsWith('META-INF/') &&
+                        !zip.files[path].dir &&
+                        (path.toLowerCase().endsWith('.musicxml') || path.toLowerCase().endsWith('.xml'))
+                );
+            }
+
+            if (!targetXmlPath || !zip.file(targetXmlPath)) {
+                throw new Error('No MusicXML score found inside the .mxl archive.');
+            }
+
+            const xmlString = await zip.file(targetXmlPath).async('string');
+            return { content: xmlString, isXml: true };
+        }
+
+        const text = await file.text();
+        const isXml =
+            lowerName.endsWith('.xml') ||
+            lowerName.endsWith('.musicxml') ||
+            text.trimStart().startsWith('<');
+
+        return { content: text, isXml };
+    }
+
     #bindChordSequencerEvents() {
-        const refreshProgression = () => {
+        const refreshProgression = (partialOverride) => {
             this.chordModel.updateSettings({
-                progressionText: this.chordView.progressionInput.value,
-                bpm: this.chordView.bpmInput.value,
-                beatsPerBar: this.chordView.beatsPerBarInput.value,
-                beatUnit: this.chordView.beatUnitSelect.value,
-                barsPerChord: this.chordView.barsPerChordSelect.value,
-                octave: this.chordView.octaveSelect.value,
+                ...(partialOverride || {
+                    progressionText: this.chordView.progressionInput.value,
+                    bpm: this.chordView.bpmInput.value,
+                    beatsPerBar: this.chordView.beatsPerBarInput.value,
+                    beatUnit: this.chordView.beatUnitSelect.value,
+                    barsPerChord: this.chordView.barsPerChordSelect.value,
+                    octave: this.chordView.octaveSelect.value,
+                    style: this.chordView.styleSelect?.value,
+                    humanize: this.chordView.humanizeInput?.value,
+                }),
             });
             this.chordView.renderChordCards(
                 this.chordModel.parsedChords,
@@ -183,12 +239,69 @@ export class MidiClientController {
             );
         };
 
-        this.chordView.progressionInput.addEventListener('input', refreshProgression);
-        this.chordView.bpmInput.addEventListener('change', refreshProgression);
-        this.chordView.beatsPerBarInput.addEventListener('change', refreshProgression);
-        this.chordView.beatUnitSelect.addEventListener('change', refreshProgression);
-        this.chordView.barsPerChordSelect.addEventListener('change', refreshProgression);
-        this.chordView.octaveSelect.addEventListener('change', refreshProgression);
+        this.chordView.progressionInput.addEventListener('input', () =>
+            refreshProgression({ progressionText: this.chordView.progressionInput.value })
+        );
+        this.chordView.bpmInput.addEventListener('change', () =>
+            refreshProgression({ bpm: this.chordView.bpmInput.value })
+        );
+        this.chordView.beatsPerBarInput.addEventListener('change', () =>
+            refreshProgression({ beatsPerBar: this.chordView.beatsPerBarInput.value })
+        );
+        this.chordView.beatUnitSelect.addEventListener('change', () =>
+            refreshProgression({ beatUnit: this.chordView.beatUnitSelect.value })
+        );
+        this.chordView.barsPerChordSelect.addEventListener('change', () =>
+            refreshProgression({ barsPerChord: this.chordView.barsPerChordSelect.value })
+        );
+        this.chordView.octaveSelect.addEventListener('change', () =>
+            refreshProgression({ octave: this.chordView.octaveSelect.value })
+        );
+        this.chordView.styleSelect?.addEventListener('change', () =>
+            refreshProgression({ style: this.chordView.styleSelect.value })
+        );
+        this.chordView.humanizeInput?.addEventListener('input', () =>
+            refreshProgression({ humanize: this.chordView.humanizeInput.value })
+        );
+
+        this.chordView.sheetFileInput?.addEventListener('change', async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+
+            try {
+                const { content, isXml } = await this.#extractSheetContent(file);
+
+                if (isXml) {
+                    const importedScore = ChordSequencerModel.parseMusicXmlTimeline(content);
+                    this.chordModel.loadImportedScore(importedScore);
+                } else {
+                    this.chordModel.updateSettings({ progressionText: content.trim() });
+                }
+
+                if (this.chordModel.isPlaying) this.#stopChordPlayback();
+                this.chordView.syncFromModel(this.chordModel);
+            } catch (err) {
+                console.error('[Sheet Import Error]', err.message);
+                await this.modalView.openConfirm({
+                    title: 'Sheet Import Error',
+                    message: err.message,
+                    confirmText: 'OK',
+                    isDanger: true,
+                });
+            } finally {
+                e.target.value = '';
+            }
+        });
+
+        this.chordView.onCardSelect = (index) => {
+            if (this.chordModel.isPlaying) {
+                this.chordModel.currentStepIndex = index;
+                this.#triggerChordStep(index);
+                this.nextStepDeadline = performance.now() + this.chordModel.getStepDurationMs(index);
+            } else {
+                this.#startChordPlayback(index);
+            }
+        };
 
         this.chordView.loopToggleBtn.addEventListener('click', () => {
             this.chordModel.updateSettings({ loop: !this.chordModel.loop });
@@ -199,20 +312,24 @@ export class MidiClientController {
             if (this.chordModel.isPlaying) {
                 this.#stopChordPlayback();
             } else {
-                this.#startChordPlayback();
+                this.#startChordPlayback(0);
             }
         });
     }
 
-    #startChordPlayback() {
+    #startChordPlayback(startIndex = 0) {
         if (!this.chordModel.parsedChords.length) return;
 
+        const safeStart = Math.max(0, Math.min(this.chordModel.parsedChords.length - 1, startIndex));
         this.chordModel.isPlaying = true;
-        this.chordModel.currentStepIndex = 0;
+        this.chordModel.currentStepIndex = safeStart;
+        this.totalBarsPlayed = safeStart;
         this.chordView.setPlaybackState(true);
 
-        this.#triggerChordStep(0);
-        this.nextStepDeadline = performance.now() + this.chordModel.getStepDurationMs();
+        this.#triggerChordStep(safeStart);
+        this.nextStepDeadline = performance.now() + this.chordModel.getStepDurationMs(safeStart);
+
+        if (this.chordTimerId) clearInterval(this.chordTimerId);
 
         this.chordTimerId = setInterval(() => {
             if (!this.chordModel.isPlaying) return;
@@ -233,7 +350,7 @@ export class MidiClientController {
 
                 this.chordModel.currentStepIndex = nextIdx;
                 this.#triggerChordStep(nextIdx);
-                this.nextStepDeadline += this.chordModel.getStepDurationMs();
+                this.nextStepDeadline += this.chordModel.getStepDurationMs(nextIdx);
             }
         }, 15);
     }
@@ -241,6 +358,7 @@ export class MidiClientController {
     #stopChordPlayback() {
         this.chordModel.isPlaying = false;
         this.chordModel.currentStepIndex = -1;
+        this.totalBarsPlayed = 0;
         if (this.chordTimerId) {
             clearInterval(this.chordTimerId);
             this.chordTimerId = null;
@@ -254,24 +372,50 @@ export class MidiClientController {
         this.#releaseActiveChordNotes();
         this.chordView.highlightStep(index);
 
-        const chord = this.chordModel.parsedChords[index];
+        const chords = this.chordModel.parsedChords;
+        const chord = chords[index];
         if (!chord || !chord.valid) return;
 
-        chord.notes.forEach((note) => {
-            this.#sendMidi({
-                type: 'noteon',
-                note,
-                velocity: this.chordModel.velocity,
-            });
+        const nextIndex = (index + 1) % chords.length;
+        const nextChord = chords[nextIndex] || null;
+
+        const stepDurationMs = this.chordModel.getStepDurationMs(index);
+        const events = this.chordModel.buildStepEvents(
+            chord,
+            stepDurationMs,
+            this.totalBarsPlayed++,
+            nextChord
+        );
+
+        events.forEach(({ note, velocity, delayMs, durationMs }) => {
+            const onTimer = setTimeout(() => {
+                this.scheduledNoteTimers.delete(onTimer);
+                if (!this.chordModel.isPlaying) return;
+
+                this.#sendMidi({ type: 'noteon', note, velocity });
+                this.activeChordNotes.add(note);
+
+                const offTimer = setTimeout(() => {
+                    this.scheduledNoteTimers.delete(offTimer);
+                    this.#sendMidi({ type: 'noteoff', note });
+                    this.activeChordNotes.delete(note);
+                }, durationMs);
+
+                this.scheduledNoteTimers.add(offTimer);
+            }, delayMs);
+
+            this.scheduledNoteTimers.add(onTimer);
         });
-        this.activeChordNotes = [...chord.notes];
     }
 
     #releaseActiveChordNotes() {
+        this.scheduledNoteTimers.forEach((id) => clearTimeout(id));
+        this.scheduledNoteTimers.clear();
+
         this.activeChordNotes.forEach((note) => {
             this.#sendMidi({ type: 'noteoff', note });
         });
-        this.activeChordNotes = [];
+        this.activeChordNotes.clear();
     }
 
     #connectWebSocket() {
