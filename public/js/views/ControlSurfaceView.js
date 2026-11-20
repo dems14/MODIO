@@ -19,10 +19,12 @@ export class ControlSurfaceView {
 
         this.knobsContainer = document.getElementById('knobsContainer');
         this.fadersContainer = document.getElementById('fadersContainer');
+        this.switchesContainer = document.getElementById('switchesContainer');
         this.padsContainer = document.getElementById('padsContainer');
 
         this.knobElements = [];
         this.faderElements = [];
+        this.switchElements = [];
         this.padElements = new Array(16);
     }
 
@@ -78,6 +80,7 @@ export class ControlSurfaceView {
     renderSurface(model, handlers) {
         this.#renderKnobs(model, handlers);
         this.#renderFaders(model, handlers);
+        this.#renderSwitches(model, handlers);
         this.#renderPads(model, handlers);
         this.refreshAllMarquees();
     }
@@ -143,6 +146,37 @@ export class ControlSurfaceView {
         }
     }
 
+    #renderSwitches(model, handlers) {
+        if (!this.switchesContainer) return;
+        this.switchesContainer.innerHTML = '';
+        for (let i = 0; i < 8; i++) {
+            const unit = document.createElement('div');
+            unit.className = 'switch-unit';
+            unit.innerHTML = `
+                <button type="button" class="switch-btn" aria-pressed="false">
+                    <span class="switch-led"></span>
+                    <span class="switch-state">OFF</span>
+                </button>
+                <div class="marquee-box"><span class="marquee-text">${model.map.switchNames[i]}</span></div>
+                <span class="cc-sub">CC ${model.map.switches[i]}</span>
+            `;
+
+            const refs = {
+                unit,
+                btn: unit.querySelector('.switch-btn'),
+                stateEl: unit.querySelector('.switch-state'),
+                marqueeBox: unit.querySelector('.marquee-box'),
+                labelEl: unit.querySelector('.marquee-text'),
+                ccSubEl: unit.querySelector('.cc-sub'),
+            };
+            this.switchElements[i] = refs;
+            this.updateSwitchValue(i, model.switchValues[i]);
+            handlers.bindSwitchEvents(i, refs);
+
+            this.switchesContainer.appendChild(unit);
+        }
+    }
+
     #renderPads(model, handlers) {
         this.padsContainer.innerHTML = '';
         MPC_PAD_ORDER.forEach((index) => {
@@ -193,6 +227,21 @@ export class ControlSurfaceView {
 
     updateFaderMeta(index, name, cc) {
         const refs = this.faderElements[index];
+        if (!refs) return;
+        this.applyMarquee(refs.marqueeBox, refs.labelEl, name);
+        refs.ccSubEl.textContent = `CC ${cc}`;
+    }
+
+    updateSwitchValue(index, isOn) {
+        const refs = this.switchElements[index];
+        if (!refs) return;
+        refs.btn.classList.toggle('active', isOn);
+        refs.btn.setAttribute('aria-pressed', String(isOn));
+        refs.stateEl.textContent = isOn ? 'ON' : 'OFF';
+    }
+
+    updateSwitchMeta(index, name, cc) {
+        const refs = this.switchElements[index];
         if (!refs) return;
         this.applyMarquee(refs.marqueeBox, refs.labelEl, name);
         refs.ccSubEl.textContent = `CC ${cc}`;

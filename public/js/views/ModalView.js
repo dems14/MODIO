@@ -3,6 +3,7 @@ import { ControllerStateModel } from '../models/ControllerStateModel.js';
 const PRESETS_BY_TYPE = Object.freeze({
     knob: ['Cutoff', 'Resonance', 'Pan', 'Reverb', 'Delay', 'Drive', 'Attack', 'Release'],
     fader: ['Volume', 'Kick', 'Snare', 'Bass', 'Vocals', 'Synth', 'Drums', 'Master'],
+    switch: ['Mute', 'Solo', 'Bypass', 'Arm', 'Rec', 'Play', 'FX', 'Latch'],
     pad: ['Kick', 'Snare', 'Clap', 'Hi-Hat', 'Crash', 'Perc', 'FX', 'Loop'],
 });
 
