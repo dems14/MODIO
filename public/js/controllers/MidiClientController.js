@@ -12,6 +12,11 @@ export class MidiClientController {
         this.draggingKnobs = new Array(8).fill(false);
         this.draggingFaders = new Array(8).fill(false);
 
+        // Multitouch pad state (supports simultaneous pads & duplicate note mappings)
+        this.padPointersByIndex = Array.from({ length: 16 }, () => new Set());
+        this.activePadNotes = new Map();       // padIndex -> { note, channel }
+        this.activeNoteRefCounts = new Map();  // `${channel}:${note}` -> count
+
         this.chordTimerId = null;
         this.scheduledNoteTimers = new Set();
         this.activeChordNotes = new Set();
@@ -25,12 +30,15 @@ export class MidiClientController {
         this.#bindHeaderEvents();
         this.#bindTabEvents();
         this.#bindChordSequencerEvents();
+        this.#bindControlRowsScrollSync();
         this.#bindTwoFingerScroll();
+        this.#bindSafetyReleaseEvents();
 
         this.chordView.syncFromModel(this.chordModel);
         this.surfaceView.renderSurface(this.model, {
             bindKnobEvents: (i, refs) => this.#bindKnobEvents(i, refs),
             bindFaderEvents: (i, refs) => this.#bindFaderEvents(i, refs),
+            bindSwitchEvents: (i, refs) => this.#bindSwitchEvents(i, refs),
             bindPadEvents: (i, refs) => this.#bindPadEvents(i, refs),
         });
 
@@ -38,6 +46,52 @@ export class MidiClientController {
 
         window.addEventListener('resize', () => this.surfaceView.refreshAllMarquees());
         this.#connectWebSocket();
+    }
+
+    /**
+     * Keeps Knobs, Faders, and Switches horizontally aligned when any row is scrolled.
+     */
+    #bindControlRowsScrollSync() {
+        const rows = [
+            this.surfaceView.knobsContainer,
+            this.surfaceView.fadersContainer,
+            this.surfaceView.switchesContainer,
+        ].filter(Boolean);
+
+        let isSyncing = false;
+
+        rows.forEach((sourceRow) => {
+            sourceRow.addEventListener(
+                'scroll',
+                () => {
+                    if (isSyncing) return;
+                    isSyncing = true;
+                    const targetLeft = sourceRow.scrollLeft;
+                    rows.forEach((otherRow) => {
+                        if (otherRow !== sourceRow && Math.abs(otherRow.scrollLeft - targetLeft) > 1) {
+                            otherRow.scrollLeft = targetLeft;
+                        }
+                    });
+                    requestAnimationFrame(() => {
+                        isSyncing = false;
+                    });
+                },
+                { passive: true }
+            );
+        });
+    }
+
+    #bindSafetyReleaseEvents() {
+        const releaseAll = () => {
+            this.draggingKnobs.fill(false);
+            this.draggingFaders.fill(false);
+            this.#releaseAllActivePads();
+        };
+
+        window.addEventListener('blur', releaseAll);
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) releaseAll();
+        });
     }
 
     #bindTabEvents() {
@@ -65,21 +119,28 @@ export class MidiClientController {
 
         this.surfaceView.editModeBtn.addEventListener('click', () => {
             this.model.isEditMode = !this.model.isEditMode;
+            if (this.model.isEditMode) {
+                this.draggingKnobs.fill(false);
+                this.draggingFaders.fill(false);
+                this.#releaseAllActivePads();
+            }
             this.surfaceView.setEditMode(this.model.isEditMode);
         });
 
         this.surfaceView.resetMapBtn.addEventListener('click', async () => {
             const confirmed = await this.modalView.openConfirm({
                 title: 'Reset Controller Mapping',
-                message: 'Restore all knob, fader, and pad names and MIDI numbers back to defaults?',
+                message: 'Restore all knob, fader, switch, and pad names and MIDI numbers back to defaults?',
                 confirmText: 'Reset All',
                 isDanger: true,
             });
             if (confirmed) {
+                this.#releaseAllActivePads();
                 this.model.reset();
                 this.surfaceView.renderSurface(this.model, {
                     bindKnobEvents: (i, refs) => this.#bindKnobEvents(i, refs),
                     bindFaderEvents: (i, refs) => this.#bindFaderEvents(i, refs),
+                    bindSwitchEvents: (i, refs) => this.#bindSwitchEvents(i, refs),
                     bindPadEvents: (i, refs) => this.#bindPadEvents(i, refs),
                 });
                 this.surfaceView.setActiveTab(this.model.activeTab);
@@ -87,6 +148,7 @@ export class MidiClientController {
         });
 
         this.surfaceView.channelSelect.addEventListener('change', (e) => {
+            this.#releaseAllActivePads();
             if (this.model.isSustainOn) {
                 this.#sendMidi({ type: 'cc', cc: 64, value: 0 });
                 this.model.setSustain(false);
@@ -109,10 +171,16 @@ export class MidiClientController {
 
     #bindTwoFingerScroll() {
         let isTwoFingerScrolling = false;
+        let isTouchOnActiveSlider = false;
         let lastMidX = 0;
         let lastMidY = 0;
         let horizontalTarget = null;
-        let verticalTarget = null;
+
+        const isPadTarget = (target) =>
+            target instanceof Element && Boolean(target.closest('.pad, .pads-grid'));
+
+        const isSliderTarget = (target) =>
+            target instanceof Element && Boolean(target.closest('.fader-track, .knob-dial'));
 
         const getMidpoint = (t1, t2) => ({
             x: (t1.clientX + t2.clientX) / 2,
@@ -122,19 +190,33 @@ export class MidiClientController {
         document.addEventListener(
             'touchstart',
             (e) => {
-                if (e.touches.length === 2) {
-                    isTwoFingerScrolling = true;
-                    this.draggingKnobs.fill(false);
-                    this.draggingFaders.fill(false);
-
-                    const mid = getMidpoint(e.touches[0], e.touches[1]);
-                    lastMidX = mid.x;
-                    lastMidY = mid.y;
-
-                    const targetEl = e.target instanceof Element ? e.target : null;
-                    horizontalTarget = targetEl?.closest('.faders-row, .knobs-row, .chord-cards-strip') || null;
-                    verticalTarget = targetEl?.closest('.pentagram-strip, .chord-cards-strip') || null;
+                if (e.touches.length !== 2) {
+                    isTwoFingerScrolling = false;
+                    isTouchOnActiveSlider = false;
+                    horizontalTarget = null;
+                    return;
                 }
+
+                const touches = Array.from(e.touches);
+                // Never scroll when playing multitouch pads
+                if (touches.some((t) => isPadTarget(t.target))) {
+                    isTwoFingerScrolling = false;
+                    horizontalTarget = null;
+                    return;
+                }
+
+                isTouchOnActiveSlider = touches.some((t) => isSliderTarget(t.target));
+                isTwoFingerScrolling = true;
+
+                const mid = getMidpoint(e.touches[0], e.touches[1]);
+                lastMidX = mid.x;
+                lastMidY = mid.y;
+
+                const targetEl = e.target instanceof Element ? e.target : null;
+                horizontalTarget =
+                    targetEl?.closest(
+                        '.faders-row, .knobs-row, .switches-row, .chord-cards-strip, .pentagram-strip'
+                    ) || null;
             },
             { passive: true }
         );
@@ -151,16 +233,20 @@ export class MidiClientController {
                 lastMidX = mid.x;
                 lastMidY = mid.y;
 
+                // If fingers are on fader tracks or knob dials, only scroll horizontally on clear horizontal motion
+                if (isTouchOnActiveSlider) {
+                    if (horizontalTarget && Math.abs(deltaX) > Math.abs(deltaY) * 1.4 && Math.abs(deltaX) > 2) {
+                        horizontalTarget.scrollLeft += deltaX;
+                    }
+                    return;
+                }
+
                 if (horizontalTarget && Math.abs(deltaX) > 0.5) {
                     horizontalTarget.scrollLeft += deltaX;
                 }
 
                 if (Math.abs(deltaY) > 0.5) {
-                    if (verticalTarget && verticalTarget.scrollHeight > verticalTarget.clientHeight) {
-                        verticalTarget.scrollTop += deltaY;
-                    } else {
-                        window.scrollBy(0, deltaY);
-                    }
+                    window.scrollBy(0, deltaY);
                 }
             },
             { passive: true }
@@ -169,8 +255,8 @@ export class MidiClientController {
         const endGesture = (e) => {
             if (e.touches.length < 2) {
                 isTwoFingerScrolling = false;
+                isTouchOnActiveSlider = false;
                 horizontalTarget = null;
-                verticalTarget = null;
             }
         };
 
@@ -425,6 +511,39 @@ export class MidiClientController {
         this.activeChordNotes.clear();
     }
 
+    #releasePadNote(index) {
+        const activeInfo = this.activePadNotes.get(index);
+        this.surfaceView.setPadActive(index, false);
+
+        if (!activeInfo) return;
+        this.activePadNotes.delete(index);
+
+        const key = `${activeInfo.channel}:${activeInfo.note}`;
+        const nextCount = (this.activeNoteRefCounts.get(key) || 1) - 1;
+
+        if (nextCount <= 0) {
+            this.activeNoteRefCounts.delete(key);
+            this.#sendMidi({
+                type: 'noteoff',
+                note: activeInfo.note,
+                channel: activeInfo.channel,
+            });
+        } else {
+            this.activeNoteRefCounts.set(key, nextCount);
+        }
+    }
+
+    #releaseAllActivePads() {
+        for (let i = 0; i < this.padPointersByIndex.length; i++) {
+            this.padPointersByIndex[i].clear();
+            if (this.activePadNotes.has(i)) {
+                this.#releasePadNote(i);
+            } else {
+                this.surfaceView.setPadActive(i, false);
+            }
+        }
+    }
+
     #connectWebSocket() {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         this.ws = new WebSocket(`${protocol}//${window.location.host}`);
@@ -455,6 +574,14 @@ export class MidiClientController {
                     this.surfaceView.updateFaderValue(idx, msg.value);
                 }
             });
+
+            this.model.map.switches.forEach((cc, idx) => {
+                if (cc === msg.cc) {
+                    const isOn = msg.value >= 64;
+                    this.model.switchValues[idx] = isOn;
+                    this.surfaceView.updateSwitchValue(idx, isOn);
+                }
+            });
         } catch {
             // Ignore malformed socket frames
         }
@@ -462,13 +589,17 @@ export class MidiClientController {
 
     #sendMidi(payload) {
         if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-            this.ws.send(JSON.stringify({ ...payload, channel: this.model.midiChannel }));
+            this.ws.send(JSON.stringify({ channel: this.model.midiChannel, ...payload }));
         }
     }
 
     #bindKnobEvents(index, { unit }) {
+        const dial = unit.querySelector('.knob-dial') || unit;
+        let activePointerId = null;
         let startY = 0;
         let startVal = 64;
+
+        unit.addEventListener('contextmenu', (e) => e.preventDefault());
 
         unit.addEventListener('click', async () => {
             if (!this.model.isEditMode) return;
@@ -484,18 +615,27 @@ export class MidiClientController {
             }
         });
 
-        unit.addEventListener('pointerdown', (e) => {
-            if (this.model.isEditMode || !e.isPrimary) return;
-            unit.setPointerCapture(e.pointerId);
-            this.draggingKnobs[index] = true;
+        dial.addEventListener('pointerdown', (e) => {
+            if (this.model.isEditMode) return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (activePointerId !== null) return;
+
+            e.preventDefault();
+            activePointerId = e.pointerId;
             startY = e.clientY;
             startVal = this.model.knobValues[index];
+            this.draggingKnobs[index] = true;
+
+            try {
+                dial.setPointerCapture(e.pointerId);
+            } catch {}
         });
 
-        unit.addEventListener('pointermove', (e) => {
-            if (this.model.isEditMode || !this.draggingKnobs[index] || !unit.hasPointerCapture(e.pointerId)) return;
+        dial.addEventListener('pointermove', (e) => {
+            if (this.model.isEditMode || e.pointerId !== activePointerId || !this.draggingKnobs[index]) return;
+
             const deltaY = startY - e.clientY;
-            const newVal = Math.max(0, Math.min(127, Math.round(startVal + deltaY * 0.8)));
+            const newVal = Math.max(0, Math.min(127, Math.round(startVal + deltaY * 0.85)));
 
             if (newVal !== this.model.knobValues[index]) {
                 this.model.knobValues[index] = newVal;
@@ -504,16 +644,23 @@ export class MidiClientController {
             }
         });
 
-        const release = () => {
+        const release = (e) => {
+            if (e && e.pointerId !== activePointerId) return;
+            activePointerId = null;
             this.draggingKnobs[index] = false;
         };
-        unit.addEventListener('pointerup', release);
-        unit.addEventListener('pointercancel', release);
+
+        dial.addEventListener('pointerup', release);
+        dial.addEventListener('pointercancel', release);
+        dial.addEventListener('lostpointercapture', release);
     }
 
     #bindFaderEvents(index, { unit, track }) {
+        let activePointerId = null;
+
         const computeAndSend = (clientY) => {
             const rect = track.getBoundingClientRect();
+            if (rect.height <= 0) return;
             const relY = Math.max(0, Math.min(rect.height, rect.bottom - clientY));
             const midiVal = Math.round((relY / rect.height) * 127);
 
@@ -523,6 +670,8 @@ export class MidiClientController {
                 this.#sendMidi({ type: 'cc', cc: this.model.map.faders[index], value: midiVal });
             }
         };
+
+        unit.addEventListener('contextmenu', (e) => e.preventDefault());
 
         unit.addEventListener('click', async () => {
             if (!this.model.isEditMode) return;
@@ -538,27 +687,111 @@ export class MidiClientController {
             }
         });
 
-        unit.addEventListener('pointerdown', (e) => {
-            if (this.model.isEditMode || !e.isPrimary) return;
-            track.setPointerCapture(e.pointerId);
+        track.addEventListener('pointerdown', (e) => {
+            if (this.model.isEditMode) return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (activePointerId !== null) return;
+
+            e.preventDefault();
+            activePointerId = e.pointerId;
             this.draggingFaders[index] = true;
+
+            try {
+                track.setPointerCapture(e.pointerId);
+            } catch {}
+
             computeAndSend(e.clientY);
         });
 
         track.addEventListener('pointermove', (e) => {
-            if (this.model.isEditMode || !this.draggingFaders[index] || !track.hasPointerCapture(e.pointerId)) return;
+            if (this.model.isEditMode || e.pointerId !== activePointerId || !this.draggingFaders[index]) return;
             computeAndSend(e.clientY);
         });
 
-        const release = () => {
+        const release = (e) => {
+            if (e && e.pointerId !== activePointerId) return;
+            activePointerId = null;
             this.draggingFaders[index] = false;
         };
+
         track.addEventListener('pointerup', release);
         track.addEventListener('pointercancel', release);
+        track.addEventListener('lostpointercapture', release);
+    }
+
+    #bindSwitchEvents(index, { unit, btn }) {
+        let activePointerId = null;
+        let startX = 0;
+        let startY = 0;
+        let moved = false;
+
+        unit.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        unit.addEventListener('click', async () => {
+            if (!this.model.isEditMode) return;
+            const res = await this.modalView.openEdit({
+                title: `Edit Switch ${index + 1}`,
+                currentName: this.model.map.switchNames[index],
+                currentMidi: this.model.map.switches[index],
+                controlType: 'switch',
+            });
+            if (res) {
+                this.model.updateControlConfig('switch', index, res.name, res.midi);
+                this.surfaceView.updateSwitchMeta(index, res.name, res.midi);
+            }
+        });
+
+        btn.addEventListener('pointerdown', (e) => {
+            if (this.model.isEditMode) return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            if (activePointerId !== null) return;
+
+            activePointerId = e.pointerId;
+            startX = e.clientX;
+            startY = e.clientY;
+            moved = false;
+            btn.classList.add('pressed');
+        });
+
+        btn.addEventListener('pointermove', (e) => {
+            if (e.pointerId !== activePointerId) return;
+            if (Math.hypot(e.clientX - startX, e.clientY - startY) > 10) {
+                moved = true;
+                btn.classList.remove('pressed');
+            }
+        });
+
+        btn.addEventListener('pointerup', (e) => {
+            if (e.pointerId !== activePointerId) return;
+            btn.classList.remove('pressed');
+            activePointerId = null;
+
+            if (!moved && !this.model.isEditMode) {
+                const nextState = !this.model.switchValues[index];
+                this.model.switchValues[index] = nextState;
+                this.surfaceView.updateSwitchValue(index, nextState);
+                this.#sendMidi({
+                    type: 'cc',
+                    cc: this.model.map.switches[index],
+                    value: nextState ? 127 : 0,
+                });
+            }
+        });
+
+        const cancelSwitch = (e) => {
+            if (e && e.pointerId !== activePointerId) return;
+            btn.classList.remove('pressed');
+            activePointerId = null;
+        };
+
+        btn.addEventListener('pointercancel', cancelSwitch);
+        btn.addEventListener('lostpointercapture', cancelSwitch);
     }
 
     #bindPadEvents(index, { pad }) {
-        let activePointerId = null;
+        const activePointers = this.padPointersByIndex[index];
+
+        pad.addEventListener('contextmenu', (e) => e.preventDefault());
 
         pad.addEventListener('click', async () => {
             if (!this.model.isEditMode) return;
@@ -575,10 +808,26 @@ export class MidiClientController {
         });
 
         const triggerOn = (e) => {
+            if (this.model.isEditMode) return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+
             e.preventDefault();
-            if (this.model.isEditMode || !e.isPrimary) return;
-            activePointerId = e.pointerId;
-            pad.setPointerCapture(e.pointerId);
+
+            const wasEmpty = activePointers.size === 0;
+            activePointers.add(e.pointerId);
+
+            try {
+                pad.setPointerCapture(e.pointerId);
+            } catch {}
+
+            if (!wasEmpty) return;
+
+            const note = this.model.map.pads[index];
+            const channel = this.model.midiChannel;
+            const key = `${channel}:${note}`;
+
+            this.activePadNotes.set(index, { note, channel });
+            this.activeNoteRefCounts.set(key, (this.activeNoteRefCounts.get(key) || 0) + 1);
             this.surfaceView.setPadActive(index, true);
 
             if (this.model.isSustainOn) {
@@ -588,24 +837,24 @@ export class MidiClientController {
 
             this.#sendMidi({
                 type: 'noteon',
-                note: this.model.map.pads[index],
+                note,
                 velocity: 120,
+                channel,
             });
         };
 
         const triggerOff = (e) => {
-            if (activePointerId !== null && (!e || e.pointerId === activePointerId)) {
-                activePointerId = null;
-                this.surfaceView.setPadActive(index, false);
-                this.#sendMidi({
-                    type: 'noteoff',
-                    note: this.model.map.pads[index],
-                });
+            if (!activePointers.has(e.pointerId)) return;
+            activePointers.delete(e.pointerId);
+
+            if (activePointers.size === 0) {
+                this.#releasePadNote(index);
             }
         };
 
         pad.addEventListener('pointerdown', triggerOn);
         pad.addEventListener('pointerup', triggerOff);
         pad.addEventListener('pointercancel', triggerOff);
+        pad.addEventListener('lostpointercapture', triggerOff);
     }
 }

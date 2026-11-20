@@ -9,6 +9,8 @@ const DEFAULT_MAP = Object.freeze({
     knobNames: ['K1', 'K2', 'K3', 'K4', 'K5', 'K6', 'K7', 'K8'],
     faders: [1, 2, 3, 4, 5, 6, 7, 8],
     faderNames: ['Fader 1', 'Fader 2', 'Fader 3', 'Fader 4', 'Fader 5', 'Fader 6', 'Fader 7', 'Fader 8'],
+    switches: [24, 25, 26, 27, 28, 29, 30, 31],
+    switchNames: ['SW 1', 'SW 2', 'SW 3', 'SW 4', 'SW 5', 'SW 6', 'SW 7', 'SW 8'],
     pads: [36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51],
     padNames: Array.from({ length: 16 }, (_, idx) => `PAD ${idx + 1}`),
 });
@@ -23,6 +25,7 @@ export class ControllerStateModel {
         this.map = this.#loadFromStorage();
         this.knobValues = new Array(8).fill(64);
         this.faderValues = new Array(8).fill(0);
+        this.switchValues = new Array(8).fill(false);
     }
 
     static formatNoteName(noteNumber) {
@@ -69,6 +72,8 @@ export class ControllerStateModel {
                 knobNames: saved.knobNames || [...DEFAULT_MAP.knobNames],
                 faders: saved.faders || [...DEFAULT_MAP.faders],
                 faderNames: saved.faderNames || [...DEFAULT_MAP.faderNames],
+                switches: saved.switches || [...DEFAULT_MAP.switches],
+                switchNames: saved.switchNames || [...DEFAULT_MAP.switchNames],
                 pads: saved.pads || [...DEFAULT_MAP.pads],
                 padNames: saved.padNames || [...DEFAULT_MAP.padNames],
             };
@@ -84,6 +89,7 @@ export class ControllerStateModel {
     reset() {
         localStorage.removeItem(STORAGE_KEY);
         this.map = structuredClone(DEFAULT_MAP);
+        this.switchValues.fill(false);
     }
 
     updateControlConfig(type, index, name, midiNumber) {
@@ -93,6 +99,9 @@ export class ControllerStateModel {
         } else if (type === 'fader') {
             this.map.faderNames[index] = name;
             this.map.faders[index] = midiNumber;
+        } else if (type === 'switch') {
+            this.map.switchNames[index] = name;
+            this.map.switches[index] = midiNumber;
         } else if (type === 'pad') {
             this.map.padNames[index] = name;
             this.map.pads[index] = midiNumber;
