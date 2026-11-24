@@ -3,7 +3,6 @@ import { ControllerStateModel } from '../models/ControllerStateModel.js';
 const PRESETS_BY_TYPE = Object.freeze({
     knob: ['Cutoff', 'Resonance', 'Pan', 'Reverb', 'Delay', 'Drive', 'Attack', 'Release'],
     fader: ['Volume', 'Kick', 'Snare', 'Bass', 'Vocals', 'Synth', 'Drums', 'Master'],
-    switch: ['Mute', 'Solo', 'Bypass', 'Arm', 'Rec', 'Play', 'FX', 'Latch'],
     pad: ['Kick', 'Snare', 'Clap', 'Hi-Hat', 'Crash', 'Perc', 'FX', 'Loop'],
 });
 
@@ -23,6 +22,9 @@ export class ModalView {
         this.cancelBtn = document.getElementById('modalCancelBtn');
         this.confirmBtn = document.getElementById('modalConfirmBtn');
 
+        this.nameLabelEl = this.nameInput?.closest('.modal-field-group')?.querySelector('label') || null;
+        this.midiFieldGroup = this.midiInput?.closest('.modal-field-group') || null;
+
         this.activeResolver = null;
         this.activeMode = null;
         this.showNotePreview = false;
@@ -41,22 +43,22 @@ export class ModalView {
             });
         });
 
-        this.midiInput.addEventListener('input', () => this.#updateNotePreview());
+        this.midiInput?.addEventListener('input', () => this.#updateNotePreview());
 
-        this.clearNameBtn.addEventListener('click', () => {
+        this.clearNameBtn?.addEventListener('click', () => {
             this.nameInput.value = '';
             this.nameInput.focus();
         });
 
-        this.cancelBtn.addEventListener('click', () => this.close(null));
-        this.backdrop.addEventListener('click', (e) => {
+        this.cancelBtn?.addEventListener('click', () => this.close(null));
+        this.backdrop?.addEventListener('click', (e) => {
             if (e.target === this.backdrop) this.close(null);
         });
 
-        this.confirmBtn.addEventListener('click', () => this.#handleConfirm());
+        this.confirmBtn?.addEventListener('click', () => this.#handleConfirm());
 
         document.addEventListener('keydown', (e) => {
-            if (!this.backdrop.classList.contains('open')) return;
+            if (!this.backdrop?.classList.contains('open')) return;
             if (e.key === 'Escape') this.close(null);
             if (e.key === 'Enter') {
                 e.preventDefault();
@@ -92,6 +94,14 @@ export class ModalView {
                 return;
             }
             this.close({ name: cleanName, midi: parsedMidi });
+        } else if (this.activeMode === 'prompt') {
+            const cleanValue = this.nameInput.value.trim();
+            if (!cleanValue) {
+                this.errorEl.textContent = 'Title cannot be empty.';
+                this.errorEl.classList.add('visible');
+                return;
+            }
+            this.close(cleanValue);
         } else {
             this.close(true);
         }
@@ -108,7 +118,12 @@ export class ModalView {
             this.fieldsEl.style.display = 'flex';
             this.errorEl.classList.remove('visible');
 
+            if (this.nameLabelEl) this.nameLabelEl.textContent = 'Control Name';
             this.nameInput.value = currentName;
+            this.nameInput.placeholder = '';
+            this.presetChipsEl.style.display = 'flex';
+            if (this.midiFieldGroup) this.midiFieldGroup.style.display = 'flex';
+
             this.midiLabelEl.textContent = this.showNotePreview ? 'MIDI Note (0 – 127)' : 'MIDI CC (0 – 127)';
             this.midiInput.value = currentMidi;
             this.#updateNotePreview();
@@ -140,6 +155,7 @@ export class ModalView {
         return new Promise((resolve) => {
             this.activeResolver = resolve;
             this.activeMode = 'confirm';
+            this.showNotePreview = false;
 
             this.titleEl.textContent = title;
             this.messageEl.textContent = message;
@@ -154,6 +170,45 @@ export class ModalView {
             this.backdrop.scrollTop = 0;
             this.backdrop.classList.add('open');
             this.backdrop.setAttribute('aria-hidden', 'false');
+        });
+    }
+
+    openPrompt({
+        title = 'Enter Title',
+        message = '',
+        label = 'Title',
+        defaultValue = '',
+        placeholder = '',
+        confirmText = 'Save',
+    }) {
+        return new Promise((resolve) => {
+            this.activeResolver = resolve;
+            this.activeMode = 'prompt';
+            this.showNotePreview = false;
+
+            this.titleEl.textContent = title;
+            this.messageEl.textContent = message;
+            this.messageEl.style.display = message ? 'block' : 'none';
+            this.fieldsEl.style.display = 'flex';
+            this.errorEl.classList.remove('visible');
+
+            if (this.nameLabelEl) this.nameLabelEl.textContent = label;
+            this.nameInput.value = defaultValue;
+            this.nameInput.placeholder = placeholder;
+            this.presetChipsEl.style.display = 'none';
+            if (this.midiFieldGroup) this.midiFieldGroup.style.display = 'none';
+
+            this.cancelBtn.style.display = 'inline-block';
+            this.confirmBtn.textContent = confirmText;
+            this.confirmBtn.className = 'btn-modal btn-primary';
+
+            this.backdrop.scrollTop = 0;
+            this.backdrop.classList.add('open');
+            this.backdrop.setAttribute('aria-hidden', 'false');
+            setTimeout(() => {
+                this.nameInput.focus();
+                this.nameInput.select();
+            }, 50);
         });
     }
 
