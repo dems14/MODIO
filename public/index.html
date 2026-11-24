@@ -3,16 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Wi-Fi MIDI Controller</title>
+    <title>MODIO — Music Over Digital I/O</title>
+    <link
+        rel="icon"
+        type="image/svg+xml"
+        href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23121214' stroke='%232e2e36' stroke-width='2'/%3E%3Crect x='13' y='14' width='8' height='36' rx='4' fill='%2327272a' stroke='%233f3f46' stroke-width='1.5'/%3E%3Crect x='14' y='28' width='6' height='21' rx='3' fill='%2300e5ff' opacity='0.55'/%3E%3Crect x='11' y='25' width='12' height='6' rx='2' fill='%2300e5ff'/%3E%3Ccircle cx='42' cy='32' r='13' fill='%231c1c21' stroke='%2352525b' stroke-width='2.5'/%3E%3Ccircle cx='42' cy='32' r='13' fill='none' stroke='%2300e5ff' stroke-width='2.5' stroke-dasharray='52 30' stroke-linecap='round' transform='rotate(135 42 32)'/%3E%3Cline x1='42' y1='32' x2='50' y2='24' stroke='%2300e5ff' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E"
+    >
     <link rel="stylesheet" href="./css/styles.css">
 </head>
 <body>
 
 <header>
-    <div class="status">
-        <div id="statusDot" class="status-dot"></div>
-        <span id="statusText">Disconnected</span>
+    <div class="header-left">
+        <div class="brand-lockup" aria-label="MODIO — Music Over Digital I/O">
+            <svg class="brand-emblem" viewBox="0 0 44 36" width="38" height="31" aria-hidden="true">
+                <!-- Left: Vertical Fader ("I") -->
+                <rect x="3" y="4" width="7" height="28" rx="3.5" fill="#27272a" stroke="#3f3f46" stroke-width="1.2" />
+                <rect x="4" y="16" width="5" height="15" rx="2.5" fill="#00e5ff" opacity="0.55" />
+                <rect x="1.5" y="13" width="10" height="5" rx="1.8" fill="#00e5ff" />
+                <!-- Right: Rotary Knob ("O") -->
+                <circle cx="29" cy="18" r="11.5" fill="#18181b" stroke="#52525b" stroke-width="2" />
+                <circle
+                    cx="29"
+                    cy="18"
+                    r="11.5"
+                    fill="none"
+                    stroke="#00e5ff"
+                    stroke-width="2"
+                    stroke-dasharray="46 28"
+                    stroke-linecap="round"
+                    transform="rotate(135 29 18)"
+                />
+                <line x1="29" y1="18" x2="36" y2="11" stroke="#00e5ff" stroke-width="2.4" stroke-linecap="round" />
+            </svg>
+
+            <div class="brand-text">
+                <span class="brand-wordmark">MOD<span class="brand-io">IO</span></span>
+                <span class="brand-subtitle">Music Over Digital I/O</span>
+            </div>
+        </div>
+
+        <div class="status" title="WebSocket Connection Status">
+            <div id="statusDot" class="status-dot"></div>
+            <span id="statusText">Disconnected</span>
+        </div>
     </div>
+
     <div class="controls-top">
         <button type="button" id="sustainBtn">Sustain: OFF</button>
         <button type="button" id="editModeBtn">Edit Controls</button>
@@ -25,19 +61,32 @@
 
 <nav class="tab-bar" id="mainTabBar" aria-label="Workspace Sections">
     <button type="button" class="tab-btn active" data-tab="all">All</button>
-    <button type="button" class="tab-btn" data-tab="controls">Controls (Knobs, Faders &amp; Switches)</button>
+    <button type="button" class="tab-btn" data-tab="controls">Controls (Knobs &amp; Faders)</button>
     <button type="button" class="tab-btn" data-tab="pads">Pads</button>
-    <button type="button" class="tab-btn" data-tab="chords">MODIO player</button>
+    <button type="button" class="tab-btn" data-tab="chords">Chord Player</button>
 </nav>
 
 <section class="chord-sequencer-panel" id="chordPanel" aria-label="Chord Progression Player">
     <div class="chord-controls-row">
         <button type="button" id="chordPlayBtn" class="chord-play-btn">▶ Play Song</button>
+        <button type="button" id="chordRecordBtn" class="chord-record-btn" title="Record incoming MIDI notes from Gemini WiFi MIDI">● Record</button>
+
+        <div class="chord-param-group">
+            <label for="chordRecModeSelect">Rec</label>
+            <select id="chordRecModeSelect">
+                <option value="realtime" selected>Real-Time</option>
+                <option value="step">Step</option>
+            </select>
+        </div>
 
         <label for="sheetFileInput" class="sheet-import-btn" title="Import Compressed MusicXML (.mxl), MusicXML (.musicxml / .xml), or Chord/Staff Sheet (.txt)">
             📄 Import Sheet
             <input type="file" id="sheetFileInput" accept=".mxl,.xml,.musicxml,.txt,.abc,.chordpro" hidden>
         </label>
+
+        <button type="button" id="sheetExportBtn" class="sheet-import-btn" title="Export current sheet or recorded take as MusicXML (.musicxml)">
+            💾 Export XML
+        </button>
 
         <div class="chord-param-group">
             <label for="chordBpmInput">BPM</label>
@@ -110,7 +159,6 @@
     <section class="left-section" id="controlsSection">
         <div class="knobs-row" id="knobsContainer"></div>
         <div class="faders-row" id="fadersContainer"></div>
-        <div class="switches-row" id="switchesContainer"></div>
     </section>
     <section class="pads-grid" id="padsContainer"></section>
 </main>

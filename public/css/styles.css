@@ -13,8 +13,6 @@
     box-sizing: border-box;
     user-select: none;
     -webkit-user-select: none;
-    -webkit-touch-callout: none;
-    -webkit-tap-highlight-color: transparent;
     touch-action: none;
 }
 
@@ -34,49 +32,6 @@ body {
     -webkit-overflow-scrolling: touch;
 }
 
-body.single-tab-mode {
-    height: 100dvh;
-    max-height: 100dvh;
-    overflow: hidden;
-}
-
-body.single-tab-mode .workspace {
-    grid-template-columns: 1fr;
-    min-height: 0;
-    overflow: hidden;
-}
-
-body.single-tab-mode .left-section {
-    height: 100%;
-    min-height: 0;
-}
-
-body.single-tab-mode .faders-row {
-    min-height: 0;
-}
-
-body.single-tab-mode .pads-grid {
-    height: 100%;
-    min-height: 0;
-    grid-template-rows: repeat(4, 1fr);
-}
-
-body.single-tab-mode .chord-sequencer-panel {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
-    margin-bottom: 0;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-}
-
-body.single-tab-mode .chord-sheet-textarea {
-    min-height: 68px;
-    max-height: 110px;
-    flex-shrink: 0;
-}
-
 header {
     display: flex;
     justify-content: space-between;
@@ -88,6 +43,64 @@ header {
     border: 1px solid #2e2e36;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.brand-lockup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-right: 12px;
+    border-right: 1px solid #2e2e36;
+}
+
+.brand-emblem {
+    display: block;
+    flex-shrink: 0;
+    filter: drop-shadow(0 0 6px rgba(0, 229, 255, 0.28));
+}
+
+.brand-text {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+    gap: 2px;
+}
+
+.brand-wordmark {
+    font-size: 1.05rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    color: var(--text-main);
+}
+
+.brand-io {
+    color: var(--accent);
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.45);
+}
+
+.brand-subtitle {
+    font-size: 0.54rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+}
+
+@media (max-width: 540px) {
+    .brand-lockup {
+        padding-right: 8px;
+    }
+    .brand-subtitle {
+        display: none;
+    }
 }
 
 .status {
@@ -150,7 +163,6 @@ button.edit-active {
 
 body.edit-mode .knob-unit,
 body.edit-mode .fader-unit,
-body.edit-mode .switch-unit,
 body.edit-mode .pad {
     outline: 1px dashed var(--accent-edit);
     outline-offset: -2px;
@@ -201,12 +213,14 @@ body.edit-mode .pad-note {
 
 body.single-tab-mode {
     height: 100dvh;
+    max-height: 100dvh;
     overflow: hidden;
 }
 
 body.single-tab-mode .workspace {
     grid-template-columns: 1fr;
     min-height: 0;
+    overflow: hidden;
 }
 
 body.single-tab-mode .left-section {
@@ -226,27 +240,18 @@ body.single-tab-mode .pads-grid {
 
 body.single-tab-mode .chord-sequencer-panel {
     flex: 1;
+    min-height: 0;
+    overflow: hidden;
     margin-bottom: 0;
+    display: flex;
+    flex-direction: column;
     justify-content: flex-start;
 }
 
 body.single-tab-mode .chord-sheet-textarea {
-    min-height: 110px;
-}
-
-body.single-tab-mode .chord-cards-strip {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-    gap: 10px;
-    overflow-y: auto;
-    flex: 1;
-    align-content: start;
-    padding-top: 4px;
-}
-
-body.single-tab-mode .chord-card {
-    min-height: 76px;
-    justify-content: center;
+    min-height: 68px;
+    max-height: 110px;
+    flex-shrink: 0;
 }
 
 /* Chord Progression & Song Sheet Sequencer */
@@ -282,6 +287,27 @@ body.single-tab-mode .chord-card {
     color: #fff;
     border-color: #ef4444;
     box-shadow: 0 0 12px rgba(239, 68, 68, 0.45);
+}
+
+.chord-record-btn {
+    background: var(--track-bg);
+    color: #fca5a5;
+    border: 1px solid #7f1d1d;
+    font-weight: 800;
+    padding: 6px 12px;
+    min-width: 96px;
+}
+
+.chord-record-btn.recording {
+    background: #dc2626;
+    color: #fff;
+    border-color: #ef4444;
+    animation: recordPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes recordPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.55); }
+    50% { box-shadow: 0 0 18px rgba(239, 68, 68, 0.95); }
 }
 
 .sheet-import-btn {
@@ -366,7 +392,7 @@ body.single-tab-mode .chord-card {
     color: var(--accent);
 }
 
-/* Grand Staff Pentagram Notation */
+/* Grand Staff Pentagram Notation (Vertical Scroll) */
 .pentagram-strip {
     background: #141418;
     border: 1px solid #2e2e36;
@@ -415,7 +441,7 @@ body.single-tab-mode .pentagram-strip {
     height: auto;
 }
 
-/* Chord Cards Strip (Horizontal in "All" tab, Vertical Grid in "Chord Player" tab) */
+/* Enhanced Chord Cards Strip & Custom Scrollbar */
 .chord-cards-strip {
     display: flex;
     align-items: stretch;
@@ -474,40 +500,50 @@ body.single-tab-mode .chord-cards-strip * {
 }
 
 .sheet-section-badge {
-    background: rgba(0, 229, 255, 0.14);
+    background: linear-gradient(180deg, rgba(0, 229, 255, 0.2), rgba(0, 229, 255, 0.08));
     border: 1px solid rgba(0, 229, 255, 0.45);
+    border-left: 3px solid var(--accent);
     color: var(--accent);
     font-size: 0.72rem;
     font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    padding: 4px 10px;
-    border-radius: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .chord-card {
-    background: #27272a;
+    background: linear-gradient(180deg, #27272a 0%, #1f1f23 100%);
     border: 1px solid #3f3f46;
-    border-radius: 6px;
-    padding: 5px 10px;
-    min-width: 82px;
+    border-radius: 8px;
+    padding: 6px 10px;
+    min-width: 96px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 2px;
+    justify-content: space-between;
+    gap: 4px;
     cursor: pointer;
-    transition: background 0.08s, border-color 0.08s, transform 0.08s;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+    transition: background 0.1s ease, border-color 0.1s ease, transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.chord-card:hover {
+    border-color: #71717a;
+    background: linear-gradient(180deg, #2e2e33 0%, #232328 100%);
 }
 
 .chord-card.playing {
-    background: rgba(0, 229, 255, 0.2);
+    background: linear-gradient(180deg, rgba(0, 229, 255, 0.26) 0%, rgba(0, 229, 255, 0.1) 100%);
     border-color: var(--accent);
-    box-shadow: 0 0 12px rgba(0, 229, 255, 0.35);
-    transform: translateY(-1px);
+    box-shadow: 0 0 14px rgba(0, 229, 255, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    transform: translateY(-2px);
 }
 
 .chord-card.invalid {
@@ -520,10 +556,46 @@ body.single-tab-mode .chord-cards-strip * {
     border-style: dashed;
 }
 
+.chord-card-header {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.62rem;
+    color: var(--text-dim);
+    font-weight: 700;
+}
+
+.chord-bar-num {
+    color: #71717a;
+    font-variant-numeric: tabular-nums;
+}
+
+.chord-card.playing .chord-bar-num {
+    color: var(--accent);
+}
+
+.chord-art-badge {
+    background: rgba(251, 191, 36, 0.16);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.35);
+    border-radius: 4px;
+    padding: 0 4px;
+    font-size: 0.56rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
 .chord-symbol {
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 800;
     color: #fff;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 
 .chord-dur-tag {
@@ -539,7 +611,13 @@ body.single-tab-mode .chord-cards-strip * {
 .chord-notes {
     font-size: 0.65rem;
     color: var(--text-dim);
+    text-align: center;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+    padding-top: 2px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .chord-empty-hint {
@@ -568,34 +646,28 @@ body.single-tab-mode .chord-cards-strip * {
     flex-direction: column;
     gap: 10px;
     min-width: 0;
-    min-height: 360px;
+    min-height: 340px;
 }
 
-/* Knobs Row */
 .knobs-row {
     display: grid;
-    grid-template-columns: repeat(8, minmax(72px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(8, minmax(48px, 1fr));
+    gap: 6px;
     background: var(--panel-bg);
-    padding: 10px 8px;
+    padding: 10px 4px;
     border-radius: 8px;
     border: 1px solid #2e2e36;
     overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
-    flex-shrink: 0;
+    touch-action: none;
     scrollbar-width: thin;
     scrollbar-color: #52525b var(--bg-dark);
 }
 
-.knobs-row::-webkit-scrollbar,
-.switches-row::-webkit-scrollbar {
+.knobs-row::-webkit-scrollbar {
     height: 6px;
 }
 
-.knobs-row::-webkit-scrollbar-thumb,
-.switches-row::-webkit-scrollbar-thumb {
+.knobs-row::-webkit-scrollbar-thumb {
     background: #52525b;
     border-radius: 4px;
 }
@@ -604,68 +676,63 @@ body.single-tab-mode .chord-cards-strip * {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 4px;
-    padding: 4px 2px;
+    gap: 3px;
+    padding: 2px;
     border-radius: 6px;
     min-width: 0;
     overflow: hidden;
-    touch-action: pan-x;
+    touch-action: none;
 }
 
 .knob-dial {
-    width: 50px;
-    height: 50px;
+    width: 40px;
+    height: 40px;
     border-radius: 50%;
     background: radial-gradient(circle at 30% 30%, #3f3f46, #18181b);
     border: 2px solid #52525b;
     position: relative;
     display: flex;
     justify-content: center;
-    cursor: ns-resize;
-    touch-action: none;
 }
 
 .knob-indicator {
-    width: 3.5px;
-    height: 16px;
+    width: 3px;
+    height: 13px;
     background: var(--accent);
     border-radius: 2px;
-    transform-origin: 50% 23px;
+    transform-origin: 50% 18px;
     transform: rotate(-135deg);
-    pointer-events: none;
 }
 
-/* Faders Row */
 .faders-row {
     display: grid;
-    grid-template-columns: repeat(8, minmax(72px, 1fr));
+    grid-template-columns: repeat(8, minmax(48px, 1fr));
     gap: 8px;
     background: var(--panel-bg);
     padding: 10px 8px 12px 8px;
     border-radius: 8px;
     border: 1px solid #2e2e36;
     flex: 1;
-    min-height: 190px;
+    min-height: 220px;
     overflow-x: auto;
     overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
+    touch-action: none;
     scrollbar-width: thin;
     scrollbar-color: #52525b var(--bg-dark);
 }
 
 .faders-row::-webkit-scrollbar {
-    height: 10px;
+    height: 8px;
 }
 
 .faders-row::-webkit-scrollbar-track {
     background: var(--bg-dark);
-    border-radius: 5px;
+    border-radius: 4px;
 }
 
 .faders-row::-webkit-scrollbar-thumb {
     background: #52525b;
-    border-radius: 5px;
+    border-radius: 4px;
 }
 
 .faders-row::-webkit-scrollbar-thumb:hover {
@@ -677,24 +744,22 @@ body.single-tab-mode .chord-cards-strip * {
     flex-direction: column;
     align-items: center;
     height: 100%;
-    gap: 5px;
+    gap: 4px;
     padding: 2px;
     border-radius: 6px;
     min-width: 0;
     overflow: hidden;
-    touch-action: pan-x;
 }
 
 .fader-track {
-    width: 48px;
+    width: 30px;
     flex: 1;
-    min-height: 120px;
+    min-height: 135px;
     background: var(--track-bg);
-    border-radius: 8px;
+    border-radius: 6px;
     position: relative;
     overflow: hidden;
     border: 1px solid #3f3f46;
-    cursor: ns-resize;
     touch-action: none;
 }
 
@@ -704,101 +769,21 @@ body.single-tab-mode .chord-cards-strip * {
     left: 0;
     right: 0;
     height: 0%;
-    background: linear-gradient(to top, rgba(0, 229, 255, 0.25), rgba(0, 229, 255, 0.78));
+    background: linear-gradient(to top, rgba(0, 229, 255, 0.25), rgba(0, 229, 255, 0.7));
     pointer-events: none;
 }
 
 .fader-cap {
     position: absolute;
-    left: 3px;
-    right: 3px;
-    height: 22px;
+    left: 2px;
+    right: 2px;
+    height: 18px;
     bottom: 0%;
     background: #e4e4e7;
-    border: 1px solid #fff;
-    border-radius: 4px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.65);
+    border-radius: 3px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
     pointer-events: none;
     transform: translateY(50%);
-}
-
-/* Toggle Switches Row */
-.switches-row {
-    display: grid;
-    grid-template-columns: repeat(8, minmax(72px, 1fr));
-    gap: 8px;
-    background: var(--panel-bg);
-    padding: 10px 8px;
-    border-radius: 8px;
-    border: 1px solid #2e2e36;
-    overflow-x: auto;
-    overflow-y: hidden;
-    -webkit-overflow-scrolling: touch;
-    touch-action: pan-x;
-    flex-shrink: 0;
-    scrollbar-width: thin;
-    scrollbar-color: #52525b var(--bg-dark);
-}
-
-.switch-unit {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-    padding: 2px;
-    border-radius: 6px;
-    min-width: 0;
-    overflow: hidden;
-    touch-action: pan-x;
-}
-
-.switch-btn {
-    width: 50px;
-    height: 48px;
-    padding: 4px;
-    border-radius: 8px;
-    background: #27272a;
-    border: 2px solid #3f3f46;
-    color: var(--text-dim);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-    touch-action: pan-x;
-    transition: background 0.08s, border-color 0.08s, box-shadow 0.08s, transform 0.06s;
-}
-
-.switch-btn.pressed {
-    transform: scale(0.94);
-}
-
-.switch-led {
-    width: 22px;
-    height: 4px;
-    border-radius: 2px;
-    background: #52525b;
-    pointer-events: none;
-    transition: background 0.08s, box-shadow 0.08s;
-}
-
-.switch-state {
-    font-size: 0.7rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
-    pointer-events: none;
-}
-
-.switch-btn.active {
-    background: rgba(0, 229, 255, 0.22);
-    border-color: var(--accent);
-    color: var(--accent);
-    box-shadow: 0 0 12px rgba(0, 229, 255, 0.35), inset 0 0 8px rgba(0, 229, 255, 0.2);
-}
-
-.switch-btn.active .switch-led {
-    background: var(--accent);
-    box-shadow: 0 0 8px var(--accent);
 }
 
 /* Marquee Auto-Scroll for Long Control Names */
@@ -808,7 +793,6 @@ body.single-tab-mode .chord-cards-strip * {
     white-space: nowrap;
     text-align: center;
     position: relative;
-    touch-action: pan-x;
 }
 
 .marquee-text {
@@ -839,15 +823,12 @@ body.single-tab-mode .chord-cards-strip * {
     font-size: 0.62rem;
     color: #71717a;
     font-weight: 500;
-    touch-action: pan-x;
 }
 
 .val-mini {
-    font-size: 0.74rem;
-    font-weight: 700;
+    font-size: 0.72rem;
     color: var(--accent);
     font-variant-numeric: tabular-nums;
-    touch-action: pan-x;
 }
 
 .pads-grid {
@@ -878,7 +859,6 @@ body.single-tab-mode .chord-cards-strip * {
 
 .pad .marquee-box {
     text-align: left;
-    touch-action: none;
 }
 
 .pad .marquee-text {

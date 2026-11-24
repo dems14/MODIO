@@ -4,9 +4,10 @@ const EventEmitter = require('events');
 const easymidi = require('easymidi');
 
 class MidiHardwareModel extends EventEmitter {
-    constructor(portName) {
+    constructor(outPortName, inPortName) {
         super();
-        this.portName = portName;
+        this.outPortName = outPortName;
+        this.inPortName = inPortName || outPortName;
         this.midiOut = null;
         this.midiIn = null;
     }
@@ -24,12 +25,18 @@ class MidiHardwareModel extends EventEmitter {
         const outputs = easymidi.getOutputs();
         const inputs = easymidi.getInputs();
 
-        const targetOut = outputs.find((name) => name.includes(this.portName)) || outputs[0];
-        const targetIn = inputs.find((name) => name.includes(this.portName)) || inputs[0];
+        const targetOut = outputs.find((name) => name.includes(this.outPortName));
+        const targetIn = inputs.find((name) => name.includes(this.inPortName));
 
         if (!targetOut || !targetIn) {
             throw new Error(
-                `No virtual MIDI ports found. Open loopMIDI and create "${this.portName}".`
+                `Missing loopMIDI ports. Create both "${this.outPortName}" and "${this.inPortName}" in loopMIDI.`
+            );
+        }
+
+        if (targetOut === targetIn) {
+            console.warn(
+                `[MIDI Model Warning] Out and In are mapped to the same port ("${targetOut}"). Use two separate ports to prevent feedback loops.`
             );
         }
 
@@ -39,9 +46,9 @@ class MidiHardwareModel extends EventEmitter {
     }
 
     #initializeUnixVirtualPorts() {
-        this.midiOut = new easymidi.Output(this.portName, true);
-        this.midiIn = new easymidi.Input(this.portName, true);
-        console.log(`[MIDI Model] Created virtual bidirectional port: "${this.portName}"`);
+        this.midiOut = new easymidi.Output(this.outPortName, true);
+        this.midiIn = new easymidi.Input(this.inPortName, true);
+        console.log(`[MIDI Model] Created virtual ports -> Out: "${this.outPortName}", In: "${this.inPortName}"`);
     }
 
     #bindIncomingEvents() {
@@ -50,6 +57,25 @@ class MidiHardwareModel extends EventEmitter {
                 type: 'cc',
                 cc: msg.controller,
                 value: msg.value,
+                channel: msg.channel,
+            });
+        });
+
+        this.midiIn.on('noteon', (msg) => {
+            const isNoteOff = msg.velocity === 0;
+            this.emit('daw:note', {
+                type: isNoteOff ? 'noteoff' : 'noteon',
+                note: msg.note,
+                velocity: msg.velocity,
+                channel: msg.channel,
+            });
+        });
+
+        this.midiIn.on('noteoff', (msg) => {
+            this.emit('daw:note', {
+                type: 'noteoff',
+                note: msg.note,
+                velocity: 0,
                 channel: msg.channel,
             });
         });

@@ -5,6 +5,7 @@ export class ChordSequencerView {
     constructor() {
         this.progressionInput = document.getElementById('chordProgressionInput');
         this.sheetFileInput = document.getElementById('sheetFileInput');
+        this.exportBtn = document.getElementById('sheetExportBtn');
         this.bpmInput = document.getElementById('chordBpmInput');
         this.beatsPerBarInput = document.getElementById('timeSigNumerator');
         this.beatUnitSelect = document.getElementById('timeSigDenominator');
@@ -14,6 +15,8 @@ export class ChordSequencerView {
         this.humanizeInput = document.getElementById('chordHumanizeInput');
         this.loopToggleBtn = document.getElementById('chordLoopBtn');
         this.playStopBtn = document.getElementById('chordPlayBtn');
+        this.recordBtn = document.getElementById('chordRecordBtn');
+        this.recModeSelect = document.getElementById('chordRecModeSelect');
         this.pentagramContainer = document.getElementById('pentagramContainer');
         this.cardsContainer = document.getElementById('chordCardsContainer');
         this.cardElements = [];
@@ -74,7 +77,7 @@ export class ChordSequencerView {
 
         if (!chords.length) {
             this.cardsContainer.innerHTML =
-                '<span class="chord-empty-hint">Type chords (Cmaj7), arpeggios (~Cmaj9), glissandos (C4~>G5), or import .mxl/.musicxml</span>';
+                '<span class="chord-empty-hint">Type chords (Cmaj7), arpeggios (~Cmaj9), glissandos (C4~>G5), record MIDI, or import .mxl/.musicxml</span>';
             return;
         }
 
@@ -133,10 +136,6 @@ export class ChordSequencerView {
         });
     }
 
-    /**
-     * Renders a responsive, multi-row Grand Staff (Treble + Bass Clef SVG Pentagram)
-     * that wraps measures cleanly across screen widths and scrolls vertically.
-     */
     renderPentagram(chords, activeIndex = -1, autoScroll = true) {
         if (!this.pentagramContainer) return;
 
@@ -145,7 +144,6 @@ export class ChordSequencerView {
         const rightMargin = 10;
         const usableWidth = containerWidth - leftMargin - rightMargin;
 
-        // Calculate optimal bars per system row based on screen width & note density
         const hasDenseWrittenScores = chords.some(
             (c) => Array.isArray(c.writtenEvents) && c.writtenEvents.length > 4
         );
@@ -169,12 +167,11 @@ export class ChordSequencerView {
             return { diatonicStep, isSharp };
         };
 
-        // Returns Y offset relative to the top of a single system row
         const stepToLocalY = (step) => {
             if (step >= 28) {
-                return 68 - (step - 30) * 4; // Treble bottom line E4 (step 30) at y = 68
+                return 68 - (step - 30) * 4;
             }
-            return 96 + (26 - step) * 4;     // Bass top line A3 (step 26) at y = 96
+            return 96 + (26 - step) * 4;
         };
 
         const renderLedgerLines = (diatonicStep, noteX, rowOffsetY) => {
@@ -204,13 +201,11 @@ export class ChordSequencerView {
             const rowY = row * systemHeight;
             const rowRightX = containerWidth - rightMargin;
 
-            // 5 Treble lines (36..68) & 5 Bass lines (96..128)
             [36, 44, 52, 60, 68, 96, 104, 112, 120, 128].forEach((localY) => {
                 const y = rowY + localY;
                 parts.push(`<line x1="10" y1="${y}" x2="${rowRightX}" y2="${y}" stroke="#3f3f46" stroke-width="1" />`);
             });
 
-            // Grand staff brace, clefs & system measure number
             parts.push(`<line x1="10" y1="${rowY + 36}" x2="10" y2="${rowY + 128}" stroke="#71717a" stroke-width="2" />`);
             parts.push(`<text x="14" y="${rowY + 64}" fill="#00e5ff" font-size="34" font-family="serif">𝄞</text>`);
             parts.push(`<text x="14" y="${rowY + 120}" fill="#00e5ff" font-size="28" font-family="serif">𝄢</text>`);
@@ -235,7 +230,6 @@ export class ChordSequencerView {
                 );
             }
 
-            // Section badge above measure if a new section starts here
             if (chord.section && chord.section !== lastSectionPrinted) {
                 lastSectionPrinted = chord.section;
                 parts.push(
@@ -243,14 +237,12 @@ export class ChordSequencerView {
                 );
             }
 
-            // Measure barline (double barline on final measure)
             const isFinalBar = idx === chords.length - 1;
             parts.push(`<line x1="${barEndX}" y1="${rowY + 36}" x2="${barEndX}" y2="${rowY + 128}" stroke="#52525b" stroke-width="${isFinalBar ? 2 : 1}" />`);
             if (isFinalBar) {
                 parts.push(`<line x1="${barEndX - 4}" y1="${rowY + 36}" x2="${barEndX - 4}" y2="${rowY + 128}" stroke="#52525b" stroke-width="1" />`);
             }
 
-            // Chord / measure label
             const maxChars = Math.max(8, Math.floor(barWidth / 6.5));
             const shortLabel = chord.symbol.length > maxChars
                 ? `${chord.symbol.slice(0, maxChars - 1)}…`
@@ -261,7 +253,6 @@ export class ChordSequencerView {
 
             if (!chord.valid || chord.isRest) return;
 
-            // 1. Glissando diagonal line & "gliss." label
             if (chord.articulation === 'glissando' && chord.notes.length >= 2) {
                 const startPos = midiToStaffPos(chord.notes[0]);
                 const endPos = midiToStaffPos(chord.notes[chord.notes.length - 1]);
@@ -287,12 +278,10 @@ export class ChordSequencerView {
                 return;
             }
 
-            // 2. Beat-accurate horizontal note plotting for dense MusicXML/MXL measures
             if (Array.isArray(chord.writtenEvents) && chord.writtenEvents.length > 0) {
                 const innerPad = 12;
                 const drawableSpan = Math.max(24, barWidth - innerPad * 2);
 
-                // Deduplicate identical pitch+time events so visual staff stays crisp
                 const seenKeys = new Set();
                 chord.writtenEvents.forEach((wn) => {
                     const bucket = Math.round(wn.startFraction * 32);
@@ -311,7 +300,6 @@ export class ChordSequencerView {
                         parts.push(`<text x="${noteX - 10}" y="${y + 3.5}" fill="#fbbf24" font-size="9.5" font-weight="700">♯</text>`);
                     }
 
-                    // Draw stem for notes shorter than a whole note
                     if (wn.durationFraction < 0.85) {
                         const stemUp = diatonicStep < 34;
                         const stemX = stemUp ? noteX + 3.8 : noteX - 3.8;
@@ -332,7 +320,6 @@ export class ChordSequencerView {
                 return;
             }
 
-            // 3. Wavy vertical Arpeggio line next to rolled chords
             if (chord.articulation === 'arp_up' || chord.articulation === 'arp_down') {
                 const ys = chord.notes.map((m) => rowY + stepToLocalY(midiToStaffPos(m).diatonicStep));
                 const topY = Math.min(...ys) - 4;
@@ -352,7 +339,6 @@ export class ChordSequencerView {
                 parts.push(`<text x="${waveX - 3.5}" y="${arrowY}" fill="#fbbf24" font-size="7">${arrowChar}</text>`);
             }
 
-            // 4. Standard Chord Noteheads & Ledger Lines
             chord.notes.forEach((midi, nIdx) => {
                 const { diatonicStep, isSharp } = midiToStaffPos(midi);
                 const y = rowY + stepToLocalY(diatonicStep);
@@ -373,7 +359,6 @@ export class ChordSequencerView {
         parts.push(`</svg>`);
         this.pentagramContainer.innerHTML = parts.join('');
 
-        // Smoothly scroll vertically to keep the active system row centered
         if (autoScroll && activeIndex >= 0) {
             const activeRow = Math.floor(activeIndex / barsPerRow);
             const targetTop = Math.max(
@@ -387,18 +372,43 @@ export class ChordSequencerView {
     highlightStep(activeIndex) {
         this.lastActiveIndex = activeIndex;
         this.renderPentagram(this.lastRenderedChords, activeIndex, true);
+
+        let activeCardEl = null;
         this.cardElements.forEach((el, idx) => {
             const isCurrent = idx === activeIndex;
             el.classList.toggle('playing', isCurrent);
-            if (isCurrent) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-            }
+            if (isCurrent) activeCardEl = el;
         });
+
+        if (activeCardEl && this.cardsContainer) {
+            const container = this.cardsContainer;
+            const isVerticalGrid = container.scrollHeight > container.clientHeight + 4;
+
+            if (isVerticalGrid) {
+                const targetTop = Math.max(
+                    0,
+                    activeCardEl.offsetTop - container.offsetTop - container.clientHeight / 2 + activeCardEl.offsetHeight / 2
+                );
+                container.scrollTo({ top: targetTop, behavior: 'smooth' });
+            } else {
+                const targetLeft = Math.max(
+                    0,
+                    activeCardEl.offsetLeft - container.offsetLeft - container.clientWidth / 2 + activeCardEl.offsetWidth / 2
+                );
+                container.scrollTo({ left: targetLeft, behavior: 'smooth' });
+            }
+        }
     }
 
     setPlaybackState(isPlaying) {
         this.playStopBtn.classList.toggle('playing', isPlaying);
         this.playStopBtn.textContent = isPlaying ? '■ Stop' : '▶ Play Song';
+    }
+
+    setRecordingState(isRecording) {
+        if (!this.recordBtn) return;
+        this.recordBtn.classList.toggle('recording', isRecording);
+        this.recordBtn.textContent = isRecording ? '■ Rec ON' : '● Record';
     }
 
     setLoopState(isLooping) {

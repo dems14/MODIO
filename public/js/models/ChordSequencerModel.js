@@ -518,12 +518,6 @@ export class ChordSequencerModel {
         };
     }
 
-    /**
-     * Parses a MusicXML (.musicxml / .xml) document into:
-     *  - sheetText: readable Lead Sheet / Pentagram notation for the editor
-     *  - timelineSteps: beat-accurate per-measure note schedules with <arpeggiate>,
-     *    <glissando>/<slide>, <staccato>, <tenuto>, <accent>, and multi-part voices.
-     */
     static parseMusicXmlTimeline(xmlString) {
         const parser = new DOMParser();
         const doc = parser.parseFromString(xmlString, 'application/xml');
@@ -769,6 +763,186 @@ export class ChordSequencerModel {
         };
     }
 
+    exportToMusicXml(title = 'Wi-Fi MIDI Controller Take') {
+        const divisions = 16;
+        const quartersPerBar = this.beatsPerBar * (4 / this.beatUnit);
+        const barDivisions = Math.max(1, Math.round(quartersPerBar * divisions));
+
+        const safeTitle = String(title)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&apos;');
+
+        const pitchMap = [
+            { step: 'C', alter: 0 },
+            { step: 'C', alter: 1 },
+            { step: 'D', alter: 0 },
+            { step: 'D', alter: 1 },
+            { step: 'E', alter: 0 },
+            { step: 'F', alter: 0 },
+            { step: 'F', alter: 1 },
+            { step: 'G', alter: 0 },
+            { step: 'G', alter: 1 },
+            { step: 'A', alter: 0 },
+            { step: 'A', alter: 1 },
+            { step: 'B', alter: 0 },
+        ];
+
+        const divToNoteType = (dur) => {
+            if (dur >= divisions * 3.5) return 'whole';
+            if (dur >= divisions * 1.5) return 'half';
+            if (dur >= divisions * 0.75) return 'quarter';
+            if (dur >= divisions * 0.375) return 'eighth';
+            return '16th';
+        };
+
+        const buildNoteXml = ({ midi, durationDiv, isChord = false, staff = 1, isStaccato = false, isTenuto = false, isAccent = false, arpDir = null }) => {
+            const p = pitchMap[((midi % 12) + 12) % 12];
+            const octave = Math.floor(midi / 12) - 1;
+            const safeDur = Math.max(1, Math.round(durationDiv));
+
+            let notations = '';
+            const arts = [];
+            if (isStaccato) arts.push('<staccato/>');
+            if (isTenuto) arts.push('<tenuto/>');
+            if (isAccent) arts.push('<accent/>');
+            const arpTag = arpDir
+                ? `<arpeggiate direction="${arpDir === 'arp_down' ? 'down' : 'up'}"/>`
+                : '';
+
+            if (arts.length || arpTag) {
+                notations = `<notations>${arts.length ? `<articulations>${arts.join('')}</articulations>` : ''}${arpTag}</notations>`;
+            }
+
+            return [
+                '      <note>',
+                isChord ? '        <chord/>' : '',
+                '        <pitch>',
+                `          <step>${p.step}</step>`,
+                p.alter ? `          <alter>${p.alter}</alter>` : '',
+                `          <octave>${octave}</octave>`,
+                '        </pitch>',
+                `        <duration>${safeDur}</duration>`,
+                `        <type>${divToNoteType(safeDur)}</type>`,
+                `        <staff>${staff}</staff>`,
+                notations ? `        ${notations}` : '',
+                '      </note>',
+            ].filter(Boolean).join('\n');
+        };
+
+        const measuresXml = this.parsedChords.map((step, idx) => {
+            const measureNum = idx + 1;
+            const lines = [`    <measure number="${measureNum}">`];
+
+            if (idx === 0) {
+                lines.push(
+                    '      <attributes>',
+                    `        <divisions>${divisions}</divisions>`,
+                    '        <key><fifths>0</fifths></key>',
+                    `        <time><beats>${this.beatsPerBar}</beats><beat-type>${this.beatUnit}</beat-type></time>`,
+                    '        <staves>2</staves>',
+                    '        <clef number="1"><sign>G</sign><line>2</line></clef>',
+                    '        <clef number="2"><sign>F</sign><line>4</line></clef>',
+                    '      </attributes>',
+                    `      <direction placement="above"><sound tempo="${this.bpm}"/></direction>`
+                );
+            }
+
+            const stepBarDivs = Math.max(1, Math.round(barDivisions * (step.durationFactor || 1)));
+
+            if (!step.valid || step.isRest || (!step.notes.length && !step.writtenEvents?.length)) {
+                lines.push(
+                    '      <note>',
+                    '        <rest/>',
+                    `        <duration>${stepBarDivs}</duration>`,
+                    `        <type>${divToNoteType(stepBarDivs)}</type>`,
+                    '        <staff>1</staff>',
+                    '      </note>'
+                );
+            } else if (Array.isArray(step.writtenEvents) && step.writtenEvents.length > 0) {
+                const sorted = [...step.writtenEvents].sort((a, b) => a.startFraction - b.startFraction);
+                let cursorDiv = 0;
+                let lastGroupStart = -1;
+
+                sorted.forEach((ev) => {
+                    const startDiv = Math.max(0, Math.min(stepBarDivs - 1, Math.round(ev.startFraction * stepBarDivs)));
+                    const durDiv = Math.max(1, Math.min(stepBarDivs - startDiv, Math.round(ev.durationFraction * stepBarDivs)));
+
+                    if (startDiv === lastGroupStart) {
+                        lines.push(buildNoteXml({
+                            midi: ev.midi,
+                            durationDiv: durDiv,
+                            isChord: true,
+                            staff: ev.midi >= 60 ? 1 : 2,
+                            isStaccato: ev.isStaccato,
+                            isTenuto: ev.isTenuto,
+                            isAccent: ev.isAccent,
+                            arpDir: ev.arpDir,
+                        }));
+                        return;
+                    }
+
+                    if (startDiv > cursorDiv) {
+                        const gap = startDiv - cursorDiv;
+                        lines.push(`      <forward><duration>${gap}</duration></forward>`);
+                        cursorDiv = startDiv;
+                    } else if (startDiv < cursorDiv) {
+                        const back = cursorDiv - startDiv;
+                        lines.push(`      <backup><duration>${back}</duration></backup>`);
+                        cursorDiv = startDiv;
+                    }
+
+                    lines.push(buildNoteXml({
+                        midi: ev.midi,
+                        durationDiv: durDiv,
+                        isChord: false,
+                        staff: ev.midi >= 60 ? 1 : 2,
+                        isStaccato: ev.isStaccato,
+                        isTenuto: ev.isTenuto,
+                        isAccent: ev.isAccent,
+                        arpDir: ev.arpDir,
+                    }));
+
+                    lastGroupStart = startDiv;
+                    cursorDiv += durDiv;
+                });
+            } else {
+                step.notes.forEach((midi, nIdx) => {
+                    lines.push(buildNoteXml({
+                        midi,
+                        durationDiv: stepBarDivs,
+                        isChord: nIdx > 0,
+                        staff: midi >= 60 ? 1 : 2,
+                        arpDir: step.articulation === 'arp_up' || step.articulation === 'arp_down'
+                            ? step.articulation
+                            : null,
+                    }));
+                });
+            }
+
+            lines.push('    </measure>');
+            return lines.join('\n');
+        }).join('\n');
+
+        return `<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE score-partwise PUBLIC "-//Recordare//DTD MusicXML 3.1 Partwise//EN" "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <work>
+    <work-title>${safeTitle}</work-title>
+  </work>
+  <part-list>
+    <score-part id="P1">
+      <part-name>Piano</part-name>
+    </score-part>
+  </part-list>
+  <part id="P1">
+${measuresXml}
+  </part>
+</score-partwise>`;
+    }
+
     static applyVoiceLeading(chords, octave = 4) {
         const registerMin = Math.max(24, (octave + 1) * 12 - 5);
         const registerMax = Math.min(108, (octave + 2) * 12 + 4);
@@ -999,17 +1173,14 @@ export class ChordSequencerModel {
 
         const humanRatio = this.humanize / 100;
 
-        // 1. Beat-accurate MusicXML/MXL written score timeline
         if (Array.isArray(chord.writtenEvents) && chord.writtenEvents.length > 0) {
             return this.#buildWrittenTimelineEvents(chord, stepDurationMs, humanRatio);
         }
 
-        // 2. Explicit Glissando Articulation (e.g., C4~>G5)
         if (chord.articulation === 'glissando' && Array.isArray(chord.glissRange)) {
             return this.#buildGlissandoEvents(chord.glissRange[0], chord.glissRange[1], stepDurationMs, humanRatio);
         }
 
-        // 3. Explicit Arpeggiate Articulation (e.g., ~Cmaj9 or ~v[C3G3B3E4])
         if (chord.articulation === 'arp_up' || chord.articulation === 'arp_down') {
             return this.#buildArpeggiateRollEvents(
                 chord.notes,
@@ -1019,7 +1190,6 @@ export class ChordSequencerModel {
             );
         }
 
-        // 4. Genre & Artist Playstyle Grooves
         const effectiveStyleKey = chord.styleOverride || this.style;
         const preset = GENRE_STYLES[effectiveStyleKey] || GENRE_STYLES.block;
         const events = [];

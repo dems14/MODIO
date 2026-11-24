@@ -11,6 +11,7 @@ class SocketBridgeController {
     initialize() {
         this.wss.on('connection', (ws, req) => this.#handleClientConnection(ws, req));
         this.midiModel.on('daw:cc', (message) => this.#broadcastToClients(message));
+        this.midiModel.on('daw:note', (message) => this.#broadcastToClients(message));
     }
 
     #handleClientConnection(ws, req) {
